@@ -11,6 +11,11 @@ Android（SenseVoice，本地转写）
         └── Windows
 ```
 
+<p align="center">
+  <img src="docs/desktop.png" width="560" alt="桌面端" />
+  <img src="docs/phone.png" width="240" alt="手机端" />
+</p>
+
 ## 为什么是这条路
 
 上一代 VibeDeck 的做法是「手机当麦克风，电脑上的豆包负责写字」：音频要过网、要虚拟声卡、要自动按语音键、要输入法配合。这条链路在 macOS 上能跑，但换到 Windows 就要重装一套驱动和输入法，且识别质量被第三方输入法绑死。
