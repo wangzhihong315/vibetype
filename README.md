@@ -64,7 +64,7 @@ cd android
 # local.properties 里写 sdk.dir，或设 ANDROID_HOME
 JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
 模型随 APK 打包，构建前先拉一次（228 MB，缓存在 `.cache/`，不进 git）：
@@ -73,9 +73,12 @@ ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
 tools/fetch_model.sh
 ```
 
-产物 `app/build/outputs/apk/debug/app-debug.apk` 约 **284 MB**。debug 包首页底部有
-「自检」按钮：把内置的一段 16 kHz 录音跑一遍完整的转写 + 发送，用来在没有真机
-麦克风时验链路。
+产物 `app/build/outputs/apk/release/app-release.apk` 约 **284 MB**。签名用仓库里的
+`android/app/vibetype-release.jks`（密码 `vibetype2026`）——本地和 CI 同一个 key，
+`adb install -r` 才能覆盖升级。这是侧载用的密钥，不是 Google Play 的发布密钥。
+
+debug 包首页底部有「自检」按钮：把内置的一段 16 kHz 录音跑一遍完整的转写 + 发送，
+用来在没有真机麦克风时验链路。
 
 ### 桌面端
 

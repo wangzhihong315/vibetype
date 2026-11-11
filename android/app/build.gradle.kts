@@ -19,9 +19,21 @@ android {
         }
     }
 
+    signingConfigs {
+        // 侧载用的固定签名：本地和 CI 同一个 key，升级安装才不会签名冲突。
+        // 这不是上架 Google Play 的密钥；真要上架时换新 key 并保密。
+        create("release") {
+            storeFile = file("vibetype-release.jks")
+            storePassword = "vibetype2026"
+            keyAlias = "vibetype"
+            keyPassword = "vibetype2026"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
