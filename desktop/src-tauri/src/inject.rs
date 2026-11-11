@@ -184,15 +184,15 @@ pub fn press_combo(key: &str, modifiers: &[String]) -> bool {
     for (keycode, modifier) in &keys {
         flags_so_far |= modifier_flag(*modifier);
         mac_post(*keycode, true, flags_so_far);
-        std::thread::sleep(std::time::Duration::from_millis(18));
+        std::thread::sleep(std::time::Duration::from_millis(8));
     }
     let ok = mac_post(code, true, flags) && mac_post(code, false, flags);
-    std::thread::sleep(std::time::Duration::from_millis(18));
+    std::thread::sleep(std::time::Duration::from_millis(8));
     for (keycode, _) in keys.iter().rev() {
         mac_post(*keycode, false, flags);
-        std::thread::sleep(std::time::Duration::from_millis(18));
+        std::thread::sleep(std::time::Duration::from_millis(8));
     }
-    std::thread::sleep(std::time::Duration::from_millis(30));
+    std::thread::sleep(std::time::Duration::from_millis(20));
     ok
 }
 

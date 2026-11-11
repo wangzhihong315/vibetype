@@ -498,7 +498,6 @@ private suspend fun PointerInputScope.trackpadGestures(
     onZoom: (Float) -> Unit,
 ) {
     val scrollSign = if (natural) 1f else -1f
-    var zoomAccum = 0f
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val started = System.currentTimeMillis()
@@ -514,6 +513,9 @@ private suspend fun PointerInputScope.trackpadGestures(
         var lastTwoDistance: Float? = null
         var twoFingerMoved = false
         var dragging = false
+        // 捏合只在本次手势内累积，松手就清零；并且限速，避免松手后还在缩放
+        var zoomAccum = 0f
+        var lastZoomAt = 0L
 
         while (true) {
             val event = awaitPointerEvent()
@@ -532,14 +534,12 @@ private suspend fun PointerInputScope.trackpadGestures(
                     val dCentroid = (centroid - previous).getDistance()
                     // 两指间距变化明显大于整体位移 → 当作捏合，而不是滚动
                     if (abs(dDistance) > 1.2f && abs(dDistance) > dCentroid * 0.8f) {
-                        zoomAccum += dDistance / density * 0.6f
-                        while (zoomAccum > 16f) {
-                            onZoom(1f)
-                            zoomAccum -= 16f
-                        }
-                        while (zoomAccum < -16f) {
-                            onZoom(-1f)
-                            zoomAccum += 16f
+                        zoomAccum += dDistance / density * 0.5f
+                        val now = System.currentTimeMillis()
+                        if (abs(zoomAccum) > 18f && now - lastZoomAt > 90) {
+                            onZoom(if (zoomAccum > 0f) 1f else -1f)
+                            lastZoomAt = now
+                            zoomAccum = 0f
                         }
                         twoFingerMoved = true
                     } else {
