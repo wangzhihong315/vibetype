@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -14,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -132,6 +134,7 @@ fun RemoteScreen(
     val pointerSpeed by vm.pointerSpeed.collectAsState()
     val naturalScroll by vm.naturalScroll.collectAsState()
     val keymap by vm.keymap.collectAsState()
+    val pendingCapsules = capsules.count { !it.synced }
 
     // 第一次连上之后自动弹一次手势说明
     LaunchedEffect(Unit) {
@@ -220,6 +223,7 @@ fun RemoteScreen(
             capsuleRecording = capsuleRecording,
             leftHanded = leftHanded,
             keymap = keymap,
+            pendingCapsules = pendingCapsules,
             onVoiceStart = vm::beginTalk,
             onVoiceEnd = vm::endTalk,
             onVoiceCancel = vm::cancelTalk,
@@ -832,6 +836,7 @@ private fun Dock(
     capsuleRecording: Boolean,
     leftHanded: Boolean,
     keymap: List<KeySlot>,
+    pendingCapsules: Int,
     onVoiceStart: () -> Unit,
     onVoiceEnd: () -> Unit,
     onVoiceCancel: () -> Unit,
@@ -853,6 +858,7 @@ private fun Dock(
                 recording = recording,
                 capsuleRecording = capsuleRecording,
                 keymap = keymap,
+                pendingCapsules = pendingCapsules,
                 onKey = onKey,
                 onCapsuleTap = onCapsuleTap,
                 onCapsuleStart = onCapsuleStart,
@@ -883,6 +889,7 @@ private fun Dock(
                 recording = recording,
                 capsuleRecording = capsuleRecording,
                 keymap = keymap,
+                pendingCapsules = pendingCapsules,
                 onKey = onKey,
                 onCapsuleTap = onCapsuleTap,
                 onCapsuleStart = onCapsuleStart,
@@ -901,6 +908,7 @@ private fun DockKeys(
     recording: Boolean,
     capsuleRecording: Boolean,
     keymap: List<KeySlot>,
+    pendingCapsules: Int,
     onKey: (String) -> Unit,
     onCapsuleTap: () -> Unit,
     onCapsuleStart: () -> Unit,
@@ -925,6 +933,7 @@ private fun DockKeys(
             CapsuleKey(
                 enabled = capsuleEnabled && !recording,
                 recording = capsuleRecording,
+                pending = pendingCapsules,
                 onTap = onCapsuleTap,
                 onStart = onCapsuleStart,
                 onEnd = onCapsuleEnd,
@@ -955,6 +964,7 @@ private fun DockKeys(
 private fun CapsuleKey(
     enabled: Boolean,
     recording: Boolean,
+    pending: Int,
     onTap: () -> Unit,
     onStart: () -> Unit,
     onEnd: () -> Unit,
@@ -965,10 +975,24 @@ private fun CapsuleKey(
     val haptics = LocalHapticFeedback.current
     var pressed by remember { mutableStateOf(false) }
     val active = recording || (pressed && enabled)
+    val hold = remember { Animatable(0f) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed || recording) 0.97f else 1f,
+        animationSpec = tween(110),
+        label = "capsuleScale",
+    )
+    LaunchedEffect(pressed) {
+        if (pressed) {
+            hold.animateTo(1f, tween(240, easing = LinearEasing))
+        } else {
+            hold.snapTo(0f)
+        }
+    }
 
     Box(
         modifier
             .height(52.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(14.dp))
             .background(
                 when {
@@ -1020,6 +1044,36 @@ private fun CapsuleKey(
                     enabled -> VibeInk
                     else -> VibeFaint
                 },
+            )
+        }
+
+        // 还没同步到电脑的条数
+        if (pending > 0 && !recording) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 5.dp, end = 6.dp)
+                    .size(15.dp)
+                    .clip(CircleShape)
+                    .background(VibeCoral),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (pending > 9) "9+" else "$pending",
+                    fontSize = 8.sp,
+                    color = Color.White,
+                )
+            }
+        }
+
+        // 按住 240ms 的开麦进度：让用户知道“再按一下就开录”
+        if (pressed && !recording) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth(hold.value)
+                    .height(3.dp)
+                    .background(VibeCoral)
             )
         }
     }
@@ -1090,12 +1144,25 @@ private fun KeyButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = tween(110),
+        label = "keyScale",
+    )
     Box(
         modifier
             .height(52.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White.copy(alpha = if (enabled) 1f else 0.45f))
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
