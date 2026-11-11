@@ -59,6 +59,27 @@ v0.1 正在开发：按住说话 → 本地转写 → 电脑上屏。
 - [ ] 英文术语识别（JSON 被听成 “J song”）
 - [ ] 首次引导、手势演示台、触控板灵敏度
 
+## 和 Agent 一起用
+
+胶囊不是待办，是**灵感收件箱**：手机上按一下、说一句就存下，连上电脑后自动同步。
+真正「消化」它的是电脑上的 Agent，路径是 MCP：
+
+```bash
+# 以 Claude Code 为例，其他客户端见 App 的「MCP」页
+claude mcp add --transport stdio vibetype -- "/Applications/VibeType.app/Contents/MacOS/vibetype" --mcp
+```
+
+给 Agent 的完整说明放在 [`skills/vibetype-capsules/SKILL.md`](skills/vibetype-capsules/SKILL.md)：
+它是什么、为什么这样设计、标准流程和边界。三种交付方式：
+
+- MCP 握手时就带一段 `instructions`，不配置也能懂；
+- `prompts/list` 里有 `organize_capsules`，一句话触发整理；
+- `resources/read` 的 `vibetype://skill` 是同一份全文；App 里也能一键装进
+  `~/.claude/skills`、`~/.agents/skills`、`~/.config/opencode/skills`、`~/.codex/skills`。
+
+推荐的闭环：`capsules_list`（只看未整理）→ Agent 归纳并追问 → 用户确认 →
+`capsules_mark` 标成已整理 → 需要落回文档时用 `text_type` 打进光标。
+
 ## 开发
 
 ### Android
