@@ -56,6 +56,24 @@ fn refresh_capsules(state: tauri::State<'_, state::AppState>) -> state::UiState 
 }
 
 #[tauri::command]
+fn set_keymap(
+    state: tauri::State<'_, state::AppState>,
+    slots: Vec<state::KeySlot>,
+) -> Result<state::UiState, String> {
+    if state.set_keymap(slots) {
+        Ok(state.snapshot())
+    } else {
+        Err("键位不合法".into())
+    }
+}
+
+#[tauri::command]
+fn reset_keymap(state: tauri::State<'_, state::AppState>) -> state::UiState {
+    state.reset_keymap();
+    state.snapshot()
+}
+
+#[tauri::command]
 fn install_skill(target: String) -> Result<String, String> {
     let home = std::env::var("HOME").map_err(|_| "找不到 HOME".to_string())?;
     let dir = match target.as_str() {
@@ -188,6 +206,8 @@ pub fn run() {
             remove_capsule,
             refresh_capsules,
             install_skill,
+            set_keymap,
+            reset_keymap,
             set_mcp_keys,
             autostart_enabled,
             set_autostart,

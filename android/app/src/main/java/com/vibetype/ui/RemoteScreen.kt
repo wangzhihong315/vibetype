@@ -37,6 +37,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -83,6 +85,7 @@ import com.vibetype.VibeInk
 import com.vibetype.VibeMuted
 import com.vibetype.capsule.Capsule
 import com.vibetype.net.ConnState
+import com.vibetype.net.KeySlot
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -119,6 +122,9 @@ fun RemoteScreen(
     val capsulePartial by vm.capsulePartial.collectAsState()
     val capsuleSaving by vm.capsuleSaving.collectAsState()
     val leftHanded by vm.leftHanded.collectAsState()
+    val pointerSpeed by vm.pointerSpeed.collectAsState()
+    val naturalScroll by vm.naturalScroll.collectAsState()
+    val keymap by vm.keymap.collectAsState()
 
     // 第一次连上之后自动弹一次手势说明
     LaunchedEffect(Unit) {
@@ -131,6 +137,14 @@ fun RemoteScreen(
     var flying by remember { mutableStateOf<Capsule?>(null) }
     LaunchedEffect(Unit) {
         vm.capsuleSaved.collect { flying = it }
+    }
+
+    // 结果卡只是确认，5 秒后收起；失败时留着让用户重试
+    LaunchedEffect(last) {
+        if (last != null && last.ack != AckState.Failed) {
+            delay(5_000)
+            vm.clearLast()
+        }
     }
 
     val recordingNow = recording || capsuleRecording
@@ -175,6 +189,8 @@ fun RemoteScreen(
             notice = notice,
             flying = flying,
             leftHanded = leftHanded,
+            pointerSpeed = pointerSpeed,
+            naturalScroll = naturalScroll,
             onFlightDone = { flying = null },
             onMove = vm::sendMove,
             onScroll = vm::sendScroll,
@@ -193,6 +209,7 @@ fun RemoteScreen(
             recording = recording,
             capsuleRecording = capsuleRecording,
             leftHanded = leftHanded,
+            keymap = keymap,
             onVoiceStart = vm::beginTalk,
             onVoiceEnd = vm::endTalk,
             onVoiceCancel = vm::cancelTalk,
@@ -209,6 +226,8 @@ fun RemoteScreen(
         SettingsSheet(
             conn = conn,
             leftHanded = leftHanded,
+            pointerSpeed = pointerSpeed,
+            naturalScroll = naturalScroll,
             debuggable = vm.debuggable,
             onDismiss = { showSettings = false },
             onSelfTest = {
@@ -216,6 +235,8 @@ fun RemoteScreen(
                 vm.selfTest()
             },
             onToggleLeftHanded = vm::setLeftHanded,
+            onSpeedChange = vm::setPointerSpeed,
+            onToggleNatural = vm::setNaturalScroll,
             onShowGestures = {
                 showSettings = false
                 showGestures = true
@@ -280,6 +301,8 @@ private fun Trackpad(
     notice: String?,
     flying: Capsule?,
     leftHanded: Boolean,
+    pointerSpeed: Float,
+    naturalScroll: Boolean,
     onFlightDone: () -> Unit,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
@@ -298,9 +321,10 @@ private fun Trackpad(
             .background(Brush.verticalGradient(listOf(PadTop, PadBottom)))
             .then(
                 if (connected) {
-                    Modifier.pointerInput(leftHanded) {
+                    Modifier.pointerInput(leftHanded, pointerSpeed, naturalScroll) {
                         trackpadGestures(
                             density, edgePx, slop, leftHanded,
+                            pointerSpeed, naturalScroll,
                             onMove, onScroll, onClick, onDown, onUp,
                         )
                     }
@@ -436,12 +460,15 @@ private suspend fun PointerInputScope.trackpadGestures(
     edgePx: Float,
     slop: Float,
     leftHanded: Boolean,
+    speed: Float,
+    natural: Boolean,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onClick: (String) -> Unit,
     onDown: () -> Unit,
     onUp: () -> Unit,
 ) {
+    val scrollSign = if (natural) 1f else -1f
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val started = System.currentTimeMillis()
@@ -470,7 +497,7 @@ private suspend fun PointerInputScope.trackpadGestures(
                 if (previous != null) {
                     val dy = centroid.y - previous.y
                     if (abs(dy) > 0.8f) {
-                        onScroll(0f, -dy / density * 0.85f)
+                        onScroll(0f, -dy / density * 0.85f * speed * scrollSign)
                         twoFingerMoved = true
                     }
                 }
@@ -490,12 +517,18 @@ private suspend fun PointerInputScope.trackpadGestures(
                 }
 
                 if (dragging) {
-                    onMove(delta.x / density * 1.35f, delta.y / density * 1.35f)
+                    onMove(
+                        delta.x / density * 1.35f * speed,
+                        delta.y / density * 1.35f * speed,
+                    )
                 } else if (total.getDistance() > slop) {
                     if (edge) {
-                        onScroll(0f, -delta.y / density * 1.2f)
+                        onScroll(0f, -delta.y / density * 1.2f * speed * scrollSign)
                     } else {
-                        onMove(delta.x / density * 1.35f, delta.y / density * 1.35f)
+                        onMove(
+                        delta.x / density * 1.35f * speed,
+                        delta.y / density * 1.35f * speed,
+                    )
                     }
                 }
             }
@@ -723,6 +756,7 @@ private fun Dock(
     recording: Boolean,
     capsuleRecording: Boolean,
     leftHanded: Boolean,
+    keymap: List<KeySlot>,
     onVoiceStart: () -> Unit,
     onVoiceEnd: () -> Unit,
     onVoiceCancel: () -> Unit,
@@ -743,6 +777,7 @@ private fun Dock(
                 capsuleEnabled = capsuleEnabled,
                 recording = recording,
                 capsuleRecording = capsuleRecording,
+                keymap = keymap,
                 onKey = onKey,
                 onCapsuleTap = onCapsuleTap,
                 onCapsuleStart = onCapsuleStart,
@@ -772,6 +807,7 @@ private fun Dock(
                 capsuleEnabled = capsuleEnabled,
                 recording = recording,
                 capsuleRecording = capsuleRecording,
+                keymap = keymap,
                 onKey = onKey,
                 onCapsuleTap = onCapsuleTap,
                 onCapsuleStart = onCapsuleStart,
@@ -789,6 +825,7 @@ private fun DockKeys(
     capsuleEnabled: Boolean,
     recording: Boolean,
     capsuleRecording: Boolean,
+    keymap: List<KeySlot>,
     onKey: (String) -> Unit,
     onCapsuleTap: () -> Unit,
     onCapsuleStart: () -> Unit,
@@ -800,6 +837,15 @@ private fun DockKeys(
         modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val keys = keymap.ifEmpty {
+            listOf(
+                KeySlot("k1", "回车"),
+                KeySlot("k2", "删除"),
+                KeySlot("k3", "esc"),
+                KeySlot("k4", "切换"),
+                KeySlot("k5", "自定义"),
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CapsuleKey(
                 enabled = capsuleEnabled && !recording,
@@ -810,13 +856,18 @@ private fun DockKeys(
                 onCancel = onCapsuleCancel,
                 modifier = Modifier.weight(1f),
             )
-            KeyButton("回车", enabled, Modifier.weight(1f)) { if (enabled) onKey("enter") }
-            KeyButton("删除", enabled, Modifier.weight(1f)) { if (enabled) onKey("delete") }
+            keys.take(2).forEach { slot ->
+                KeyButton(slot.label, enabled, Modifier.weight(1f)) {
+                    if (enabled) onKey(slot.id)
+                }
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            KeyButton("esc", enabled, Modifier.weight(1f)) { if (enabled) onKey("esc") }
-            KeyButton("切换", enabled, Modifier.weight(1f)) { if (enabled) onKey("switch") }
-            KeyButton("自定义", enabled, Modifier.weight(1f)) { if (enabled) onKey("custom") }
+            keys.drop(2).take(3).forEach { slot ->
+                KeyButton(slot.label, enabled, Modifier.weight(1f)) {
+                    if (enabled) onKey(slot.id)
+                }
+            }
         }
     }
 }
@@ -985,9 +1036,13 @@ private fun KeyButton(
 private fun SettingsSheet(
     conn: ConnState,
     leftHanded: Boolean,
+    pointerSpeed: Float,
+    naturalScroll: Boolean,
     debuggable: Boolean,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
+    onSpeedChange: (Float) -> Unit,
+    onToggleNatural: (Boolean) -> Unit,
     onShowGestures: () -> Unit,
     onSelfTest: () -> Unit,
     onUnpair: () -> Unit,
@@ -1040,6 +1095,47 @@ private fun SettingsSheet(
                     Switch(
                         checked = leftHanded,
                         onCheckedChange = onToggleLeftHanded,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = VibeGreen,
+                        ),
+                    )
+                }
+
+                Column(Modifier.padding(bottom = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("指针速度", fontSize = 14.sp, color = VibeInk)
+                        Spacer(Modifier.weight(1f))
+                        Text(speedLabel(pointerSpeed), fontSize = 12.sp, color = VibeMuted)
+                    }
+                    Slider(
+                        value = pointerSpeed,
+                        onValueChange = onSpeedChange,
+                        valueRange = 0.6f..2f,
+                        steps = 6,
+                        colors = SliderDefaults.colors(
+                            thumbColor = VibeBlue,
+                            activeTrackColor = VibeBlue,
+                        ),
+                    )
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("慢", fontSize = 10.sp, color = VibeFaint)
+                        Spacer(Modifier.weight(1f))
+                        Text("快", fontSize = 10.sp, color = VibeFaint)
+                    }
+                }
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("自然滚动", fontSize = 14.sp, color = VibeInk)
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = naturalScroll,
+                        onCheckedChange = onToggleNatural,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = VibeGreen,
@@ -1509,4 +1605,11 @@ private fun capsuleMeta(capsule: Capsule): String {
     val seconds = capsule.durationMs / 1000
     val duration = "%d:%02d".format(seconds / 60, seconds % 60)
     return if (capsule.synced) "$duration · 已同步到电脑" else "$duration · 只在手机"
+}
+
+private fun speedLabel(value: Float): String = when {
+    value < 0.85f -> "慢"
+    value < 1.2f -> "标准"
+    value < 1.6f -> "快"
+    else -> "很快"
 }

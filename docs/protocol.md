@@ -69,7 +69,36 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 ```
 
 `action`：`move` / `scroll` / `click` / `down` / `up`。`button`：`left` / `right` / `middle`。
-`key.name`：`enter` / `delete` / `esc` / `switch` / `custom`。
+
+## 键位
+
+手机只发动作 id，按什么键由桌面端决定。`welcome` 里带上当前键位：
+
+```json
+{"t":"welcome","v":1,"keys":[
+  {"id":"k1","label":"回车","key":"enter","modifiers":[]},
+  {"id":"k2","label":"删除","key":"backspace","modifiers":[]},
+  {"id":"k3","label":"esc","key":"escape","modifiers":[]},
+  {"id":"k4","label":"切换","key":"tab","modifiers":["cmd"]},
+  {"id":"k5","label":"自定义","key":"up","modifiers":["ctrl"]}
+]}
+```
+
+手机按键 → 桌面：
+
+```json
+{"t":"key","name":"k1"}
+```
+
+桌面端改键位后主动推送，手机不必重连：
+
+```json
+{"t":"keymap","keys":[ ... 同上 ... ]}
+```
+
+`key` 的取值：`enter` / `tab` / `space` / `escape` / `backspace` / `delete` / `up` / `down` / `left` / `right` / `pageup` / `pagedown` / `home` / `end`。
+`modifiers`：macOS 用 `cmd` / `ctrl` / `alt` / `shift`，Windows 用 `ctrl` / `alt` / `shift` / `meta`。
+老版本会发 `enter` / `delete` / `esc` / `switch` / `custom` 这些别名，桌面端按 k1–k5 兼容。
 
 ## 胶囊
 

@@ -140,64 +140,185 @@ pub fn pointer(action: &str, button: &str, dx: f32, dy: f32) -> bool {
     .unwrap_or(false)
 }
 
-/// 遥控器上的固定按键。
+/// 遥控器上的按键：手机只发动作，这里按桌面端配置的键位执行。
 ///
 /// macOS 直接发 CGEvent 键码。enigo 的 `Key::Backspace` 在当前版本里
 /// 投递出去 TextEdit 不认，所以按键这一层不绕它。
 #[cfg(target_os = "macos")]
-pub fn press_key(name: &str) -> bool {
+pub fn press_combo(key: &str, modifiers: &[String]) -> bool {
     use core_graphics::event::CGEventFlags;
 
+    let Some(code) = mac_code(key) else {
+        return false;
+    };
+    // ⌃↑（调度中心）用系统服务打开：这台 Mac 上 Chrome 一类 App 会开启
+    // Secure Input，合成出来的 ⌃↑ 到不了系统快捷键，但 open 服务不受影响。
+    if key == "up" && modifiers.iter().any(|m| m == "ctrl") && modifiers.len() == 1 {
+        let opened = std::process::Command::new("open")
+            .args(["-b", "com.apple.exposelauncher"])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if opened {
+            return true;
+        }
+    }
+
+    let mut flags = CGEventFlags::empty();
+    let mut keys: Vec<(u16, &str)> = Vec::new();
+    for modifier in modifiers {
+        let (flag, keycode) = match modifier.as_str() {
+            "cmd" => (CGEventFlags::CGEventFlagCommand, 55),
+            "ctrl" => (CGEventFlags::CGEventFlagControl, 59),
+            "alt" => (CGEventFlags::CGEventFlagAlternate, 58),
+            "shift" => (CGEventFlags::CGEventFlagShift, 56),
+            _ => continue,
+        };
+        flags |= flag;
+        keys.push((keycode, modifier.as_str()));
+    }
+    // 修饰键要单独按下再松开：像 ⌃↑ 这种系统级快捷键不只看 flags，
+    // 只看合成事件里的修饰位，Mission Control 不会响应。
+    let mut flags_so_far = CGEventFlags::empty();
+    for (keycode, modifier) in &keys {
+        flags_so_far |= modifier_flag(*modifier);
+        mac_post(*keycode, true, flags_so_far);
+        std::thread::sleep(std::time::Duration::from_millis(18));
+    }
+    let ok = mac_post(code, true, flags) && mac_post(code, false, flags);
+    std::thread::sleep(std::time::Duration::from_millis(18));
+    for (keycode, _) in keys.iter().rev() {
+        mac_post(*keycode, false, flags);
+        std::thread::sleep(std::time::Duration::from_millis(18));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(30));
+    ok
+}
+
+#[cfg(target_os = "macos")]
+fn modifier_flag(name: &str) -> core_graphics::event::CGEventFlags {
+    use core_graphics::event::CGEventFlags;
     match name {
-        "enter" => mac_key(36, CGEventFlags::empty()),
-        "delete" => mac_key(51, CGEventFlags::empty()),
-        "esc" => mac_key(53, CGEventFlags::empty()),
-        "switch" => mac_key(48, CGEventFlags::CGEventFlagCommand),
-        "custom" => mac_key(126, CGEventFlags::CGEventFlagControl),
-        _ => false,
+        "cmd" => CGEventFlags::CGEventFlagCommand,
+        "ctrl" => CGEventFlags::CGEventFlagControl,
+        "alt" => CGEventFlags::CGEventFlagAlternate,
+        "shift" => CGEventFlags::CGEventFlagShift,
+        _ => CGEventFlags::empty(),
     }
 }
 
 #[cfg(target_os = "macos")]
-fn mac_key(keycode: u16, flags: core_graphics::event::CGEventFlags) -> bool {
+fn mac_post(keycode: u16, down: bool, flags: core_graphics::event::CGEventFlags) -> bool {
     use core_graphics::event::{CGEvent, CGEventTapLocation};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
-    let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) else {
+    let Ok(source) = CGEventSource::new(CGEventSourceStateID::HIDSystemState) else {
         return false;
     };
-    let Ok(down) = CGEvent::new_keyboard_event(source.clone(), keycode, true) else {
+    let Ok(event) = CGEvent::new_keyboard_event(source, keycode, down) else {
         return false;
     };
-    down.set_flags(flags);
-    down.post(CGEventTapLocation::HID);
-    let Ok(up) = CGEvent::new_keyboard_event(source, keycode, false) else {
-        return false;
-    };
-    up.set_flags(flags);
-    up.post(CGEventTapLocation::HID);
+    event.set_flags(flags);
+    event.post(CGEventTapLocation::HID);
     true
 }
 
+#[cfg(target_os = "macos")]
+fn mac_code(key: &str) -> Option<u16> {
+    Some(match key {
+        "enter" => 36,
+        "tab" => 48,
+        "space" => 49,
+        "backspace" => 51,
+        "escape" => 53,
+        "delete" => 117,
+        "home" => 115,
+        "pageup" => 116,
+        "end" => 119,
+        "pagedown" => 121,
+        "left" => 123,
+        "right" => 124,
+        "down" => 125,
+        "up" => 126,
+        _ => return None,
+    })
+}
+
 #[cfg(not(target_os = "macos"))]
-pub fn press_key(name: &str) -> bool {
-    with_mouse(|enigo| match name {
-        "enter" => enigo.key(Key::Return, Direction::Click).is_ok(),
-        "delete" => enigo.key(Key::Backspace, Direction::Click).is_ok(),
-        "esc" => enigo.key(Key::Escape, Direction::Click).is_ok(),
-        "switch" => {
-            enigo.key(Key::Alt, Direction::Press).is_ok()
-                && enigo.key(Key::Tab, Direction::Click).is_ok()
-                && enigo.key(Key::Alt, Direction::Release).is_ok()
+pub fn press_combo(key: &str, modifiers: &[String]) -> bool {
+    let Some(main) = enigo_key(key) else {
+        return false;
+    };
+    with_mouse(|enigo| {
+        let mut pressed = Vec::new();
+        // 先按修饰键，再点主键，最后倒序松开
+        for name in ["ctrl", "alt", "shift", "meta", "cmd"] {
+            if modifiers.iter().any(|m| m == name) {
+                if let Some(modifier) = enigo_modifier(name) {
+                    if enigo.key(modifier, Direction::Press).is_ok() {
+                        pressed.push(modifier);
+                    }
+                }
+            }
         }
-        "custom" => {
-            enigo.key(Key::Meta, Direction::Press).is_ok()
-                && enigo.key(Key::Tab, Direction::Click).is_ok()
-                && enigo.key(Key::Meta, Direction::Release).is_ok()
+        let ok = enigo.key(main, Direction::Click).is_ok();
+        for modifier in pressed.into_iter().rev() {
+            let _ = enigo.key(modifier, Direction::Release);
         }
-        _ => false,
+        ok
     })
     .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn enigo_key(key: &str) -> Option<Key> {
+    Some(match key {
+        "enter" => Key::Return,
+        "tab" => Key::Tab,
+        "space" => Key::Space,
+        "backspace" => Key::Backspace,
+        "escape" => Key::Escape,
+        "delete" => Key::Delete,
+        "home" => Key::Home,
+        "end" => Key::End,
+        "pageup" => Key::PageUp,
+        "pagedown" => Key::PageDown,
+        "left" => Key::LeftArrow,
+        "right" => Key::RightArrow,
+        "up" => Key::UpArrow,
+        "down" => Key::DownArrow,
+        _ => return None,
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn enigo_modifier(name: &str) -> Option<Key> {
+    Some(match name {
+        "ctrl" => Key::Control,
+        "alt" => Key::Alt,
+        "shift" => Key::Shift,
+        "meta" => Key::Meta,
+        "cmd" => Key::Meta,
+        _ => return None,
+    })
+}
+
+/// 旧的固定按键入口：MCP 的 `keys_press` 还在用。
+pub fn press_key(name: &str) -> bool {
+    match name {
+        "enter" => press_combo("enter", &[]),
+        "delete" => press_combo("backspace", &[]),
+        "esc" => press_combo("escape", &[]),
+        "switch" => press_combo(
+            "tab",
+            &[if cfg!(target_os = "macos") { "cmd" } else { "alt" }.to_string()],
+        ),
+        "custom" => press_combo(
+            if cfg!(target_os = "macos") { "up" } else { "tab" },
+            &[if cfg!(target_os = "macos") { "ctrl" } else { "meta" }.to_string()],
+        ),
+        _ => false,
+    }
 }
 
 /// 剪贴板 + ⌘V / Ctrl+V，给不吃合成按键的 App 兜底。

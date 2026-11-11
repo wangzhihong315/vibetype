@@ -148,6 +148,7 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
         "platform": std::env::consts::OS,
         "inject": state.injection(),
         "deviceToken": issued.unwrap_or_default(),
+        "keys": state.keymap(),
     });
     send_line(&mut writer, welcome).await?;
 
@@ -158,10 +159,18 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
         state.set_device(&platform);
     }
 
+    let mut keymap_rx = state.subscribe_keymap();
+
     loop {
-        let line = match timeout(IDLE_TIMEOUT, lines.next_line()).await {
-            Ok(Ok(Some(line))) => line,
-            _ => break,
+        let line = tokio::select! {
+            result = timeout(IDLE_TIMEOUT, lines.next_line()) => match result {
+                Ok(Ok(Some(line))) => line,
+                _ => break,
+            },
+            Ok(keys) = keymap_rx.recv() => {
+                let _ = send_line(&mut writer, json!({ "t": "keymap", "keys": keys })).await;
+                continue;
+            }
         };
 
         let frame: Frame = match serde_json::from_str(&line) {
@@ -228,11 +237,12 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
             "key" => {
                 #[cfg(debug_assertions)]
                 eprintln!("key frame: {}", frame.name);
-                let name = frame.name.clone();
-                let _ = tokio::task::spawn_blocking(move || {
-                    inject::press_key(&name);
-                })
-                .await;
+                if let Some(slot) = state.resolve_key(&frame.name) {
+                    let _ = tokio::task::spawn_blocking(move || {
+                        inject::press_combo(&slot.key, &slot.modifiers);
+                    })
+                    .await;
+                }
             }
             _ => {}
         }

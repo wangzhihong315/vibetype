@@ -10,6 +10,7 @@ type Device = {
   last_seen: number;
   online: boolean;
 };
+type KeySlot = { id: string; label: string; key: string; modifiers: string[] };
 type Capsule = {
   id: string;
   text: string;
@@ -33,6 +34,7 @@ type UiState = {
   devices: Device[];
   capsules: Capsule[];
   mcp_keys: boolean;
+  keymap: KeySlot[];
 };
 
 type Page = "overview" | "connect" | "devices" | "capsules" | "mcp" | "settings";
@@ -253,6 +255,8 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [clientId, setClientId] = useState("claude");
+  const [keyDraft, setKeyDraft] = useState<KeySlot[]>([]);
+  const [keyDirty, setKeyDirty] = useState(false);
 
   useEffect(() => {
     invoke<UiState>("ui_state").then(setState).catch(console.error);
@@ -279,6 +283,10 @@ export default function App() {
     const timer = window.setTimeout(() => setConfirmRevoke(false), 3000);
     return () => window.clearTimeout(timer);
   }, [confirmRevoke]);
+
+  useEffect(() => {
+    if (!keyDirty) setKeyDraft(state?.keymap ?? []);
+  }, [state?.keymap, keyDirty]);
 
   const capsules = state?.capsules ?? [];
   const capsule = useMemo(
@@ -342,6 +350,46 @@ export default function App() {
     } catch {
       /* 剪贴板不可用就算了 */
     }
+  }
+
+  function patchKey(index: number, patch: Partial<KeySlot>) {
+    setKeyDraft((prev) =>
+      prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot))
+    );
+    setKeyDirty(true);
+  }
+
+  function toggleModifier(index: number, modifier: string) {
+    setKeyDraft((prev) =>
+      prev.map((slot, i) => {
+        if (i !== index) return slot;
+        const has = slot.modifiers.includes(modifier);
+        return {
+          ...slot,
+          modifiers: has
+            ? slot.modifiers.filter((item) => item !== modifier)
+            : [...slot.modifiers, modifier],
+        };
+      })
+    );
+    setKeyDirty(true);
+  }
+
+  async function saveKeymap() {
+    try {
+      setState(await invoke<UiState>("set_keymap", { slots: keyDraft }));
+      setKeyDirty(false);
+      setFlash("键位已保存，手机同步更新");
+    } catch (error) {
+      console.error(error);
+      setFlash("保存失败：标签 1–8 个字，按键要在列表里");
+    }
+  }
+
+  async function resetKeymap() {
+    setState(await invoke<UiState>("reset_keymap"));
+    setKeyDirty(false);
+    setFlash("已恢复默认键位");
   }
 
   async function installSkill(target: string, label: string) {
@@ -899,6 +947,68 @@ export default function App() {
               </div>
             </div>
 
+            <div className="card">
+              <div className="card-head">
+                <div>
+                  <h2>手机按键</h2>
+                  <p className="sub">
+                    手机只发动作，这里决定按什么键；保存后立即推到手机
+                  </p>
+                </div>
+                <button className="link" onClick={resetKeymap}>
+                  恢复默认
+                </button>
+              </div>
+
+              <div className="keys-editor">
+                {keyDraft.map((slot, index) => (
+                  <div className="key-row" key={slot.id}>
+                    <input
+                      className="key-label"
+                      value={slot.label}
+                      maxLength={8}
+                      onChange={(event) => patchKey(index, { label: event.target.value })}
+                    />
+                    <select
+                      className="key-select"
+                      value={slot.key}
+                      onChange={(event) => patchKey(index, { key: event.target.value })}
+                    >
+                      {KEY_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mods">
+                      {modifiersFor(state.platform).map(([id, symbol]) => (
+                        <button
+                          key={id}
+                          className={slot.modifiers.includes(id) ? "mod on" : "mod"}
+                          onClick={() => toggleModifier(index, id)}
+                        >
+                          {symbol}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className={keyDirty ? "quick primary save-keys" : "quick save-keys"}
+                disabled={!keyDirty}
+                onClick={saveKeymap}
+              >
+                {keyDirty ? "保存键位" : "键位已保存"}
+              </button>
+              <p className="hint">
+                「切换」默认 {state.platform === "windows" ? "Alt+Tab" : "⌘Tab"}，
+                「自定义」默认 {state.platform === "windows" ? "Win+Tab" : "⌃↑"}；
+                手机上显示的是标签。
+              </p>
+            </div>
+
             <p className="hint">
               VibeType 0.1.0 · 手机本地转写（X-ASR）· 这里只收文字和胶囊。
             </p>
@@ -909,6 +1019,39 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+const KEY_OPTIONS: [string, string][] = [
+  ["enter", "回车 Enter"],
+  ["tab", "Tab"],
+  ["space", "空格"],
+  ["escape", "Esc"],
+  ["backspace", "退格 Backspace"],
+  ["delete", "向前删除 Delete"],
+  ["up", "↑ 上"],
+  ["down", "↓ 下"],
+  ["left", "← 左"],
+  ["right", "→ 右"],
+  ["pageup", "PageUp"],
+  ["pagedown", "PageDown"],
+  ["home", "Home"],
+  ["end", "End"],
+];
+
+function modifiersFor(platform: string): [string, string][] {
+  return platform === "windows"
+    ? [
+        ["ctrl", "Ctrl"],
+        ["alt", "Alt"],
+        ["shift", "Shift"],
+        ["meta", "Win"],
+      ]
+    : [
+        ["cmd", "⌘"],
+        ["ctrl", "⌃"],
+        ["alt", "⌥"],
+        ["shift", "⇧"],
+      ];
 }
 
 const skillPrompt =

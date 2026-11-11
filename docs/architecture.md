@@ -53,6 +53,18 @@ src-tauri/src/
 └── net.rs           本机局域网地址、二维码内容
 ```
 
+### 键位与系统快捷键
+
+手机只发动作 id（`k1`–`k5`），按什么键由桌面端决定，改完通过 `keymap` 帧实时推给手机。
+
+macOS 上普通按键走 CGEvent（建行、退格、Esc、方向键、Tab 组合都验证过）。系统级动作另做处理：
+
+- **调度中心**（默认「自定义」= ⌃↑）：这台 Mac 开着 Chrome 一类会启用 Secure Input 的 App 时，
+  合成出来的 ⌃↑ 到不了系统快捷键，所以直接调 `open -b com.apple.exposelauncher`；
+- **切换应用**（默认「切换」= ⌘Tab）：走合成事件，Secure Input 打开时可能不生效，属于系统限制。
+
+Windows 侧统一用 enigo：`Alt+Tab` 切应用、`Win+Tab` 任务视图。
+
 ### 注入策略
 
 1. **直接注入**（默认）：把文本按 UTF-16 拆成事件，逐个投递。

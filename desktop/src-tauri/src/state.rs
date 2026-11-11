@@ -7,6 +7,7 @@ use qrcode::QrCode;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::broadcast;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
@@ -30,6 +31,16 @@ impl Entry {
             mode: mode.to_string(),
         }
     }
+}
+
+/// 手机底部那排键：手机只发动作 id，具体按什么键由桌面端决定。
+#[derive(Clone, Serialize, Deserialize)]
+pub struct KeySlot {
+    pub id: String,
+    pub label: String,
+    pub key: String,
+    #[serde(default)]
+    pub modifiers: Vec<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -75,6 +86,7 @@ pub struct UiState {
     pub devices: Vec<DeviceView>,
     pub capsules: Vec<Capsule>,
     pub mcp_keys: bool,
+    pub keymap: Vec<KeySlot>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -97,6 +109,7 @@ pub struct Inner {
     pub qr_svg: String,
     pub devices: Vec<Device>,
     pub capsules: Vec<Capsule>,
+    pub keymap: Vec<KeySlot>,
     pub history: Vec<Entry>,
     pub injection: String,
     pub connected: u32,
@@ -115,6 +128,8 @@ pub enum TokenKind {
 pub struct AppState {
     app: AppHandle,
     inner: Arc<Mutex<Inner>>,
+    /// 键位改了就推给已连接手机，不用重连。
+    keymap_tx: broadcast::Sender<Vec<KeySlot>>,
 }
 
 impl AppState {
@@ -122,6 +137,9 @@ impl AppState {
         let code = new_code();
         let devices = load_devices(&app);
         let capsules = load_json::<Vec<Capsule>>(&app, "capsules.json").unwrap_or_default();
+        let keymap = load_json::<Vec<KeySlot>>(&app, "keymap.json")
+            .filter(|slots| valid_keymap(slots))
+            .unwrap_or_else(default_keymap);
         let history = load_json::<Vec<Entry>>(&app, "history.json").unwrap_or_default();
         let injection = match std::env::var("VIBETYPE_INJECT").as_deref() {
             Ok("paste") => "paste",
@@ -135,15 +153,22 @@ impl AppState {
             prev_code: String::new(),
             devices,
             capsules,
+            keymap,
             history,
             injection: injection.to_string(),
             connected: 0,
             device: String::new(),
         };
+        let (keymap_tx, _) = broadcast::channel(16);
         Self {
             app,
             inner: Arc::new(Mutex::new(inner)),
+            keymap_tx,
         }
+    }
+
+    pub fn subscribe_keymap(&self) -> broadcast::Receiver<Vec<KeySlot>> {
+        self.keymap_tx.subscribe()
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
@@ -178,6 +203,7 @@ impl AppState {
                 .collect(),
             capsules: inner.capsules.clone(),
             mcp_keys: mcp_keys_enabled(&self.app),
+            keymap: inner.keymap.clone(),
         }
     }
 
@@ -326,6 +352,48 @@ impl AppState {
         self.emit_state();
     }
 
+    pub fn keymap(&self) -> Vec<KeySlot> {
+        self.lock().keymap.clone()
+    }
+
+    pub fn set_keymap(&self, slots: Vec<KeySlot>) -> bool {
+        if !valid_keymap(&slots) {
+            return false;
+        }
+        {
+            let mut inner = self.lock();
+            inner.keymap = slots;
+            save_json(&self.app, "keymap.json", &inner.keymap);
+            let _ = self.keymap_tx.send(inner.keymap.clone());
+        }
+        self.emit_state();
+        true
+    }
+
+    pub fn reset_keymap(&self) {
+        {
+            let mut inner = self.lock();
+            inner.keymap = default_keymap();
+            save_json(&self.app, "keymap.json", &inner.keymap);
+            let _ = self.keymap_tx.send(inner.keymap.clone());
+        }
+        self.emit_state();
+    }
+
+    /// 手机发来的是动作 id（k1..k5），老版本还会发 enter/delete/... 等别名。
+    pub fn resolve_key(&self, name: &str) -> Option<KeySlot> {
+        let alias = match name {
+            "enter" => "k1",
+            "delete" => "k2",
+            "esc" => "k3",
+            "switch" => "k4",
+            "custom" => "k5",
+            other => other,
+        };
+        let inner = self.lock();
+        inner.keymap.iter().find(|slot| slot.id == alias).cloned()
+    }
+
     /// MCP 进程也会往 capsules.json 里写，定时把文件读回来。
     pub fn reload_capsules(&self) {
         let Some(items) = load_json::<Vec<Capsule>>(&self.app, "capsules.json") else {
@@ -390,6 +458,88 @@ impl AppState {
         }
         self.emit_state();
     }
+}
+
+pub const KEYS: [&str; 14] = [
+    "enter", "tab", "space", "escape", "backspace", "delete", "up", "down", "left", "right",
+    "pageup", "pagedown", "home", "end",
+];
+
+fn modifiers_for_os() -> [&'static str; 4] {
+    if cfg!(target_os = "macos") {
+        ["cmd", "ctrl", "alt", "shift"]
+    } else {
+        ["ctrl", "alt", "shift", "meta"]
+    }
+}
+
+fn valid_keymap(slots: &[KeySlot]) -> bool {
+    if slots.len() != 5 {
+        return false;
+    }
+    let allowed_mods = modifiers_for_os();
+    for (index, slot) in slots.iter().enumerate() {
+        if slot.id != format!("k{}", index + 1) {
+            return false;
+        }
+        if slot.label.trim().is_empty() || slot.label.chars().count() > 8 {
+            return false;
+        }
+        if !KEYS.contains(&slot.key.as_str()) {
+            return false;
+        }
+        if slot.modifiers.iter().any(|m| !allowed_mods.contains(&m.as_str())) {
+            return false;
+        }
+    }
+    true
+}
+
+pub fn default_keymap() -> Vec<KeySlot> {
+    let mac = cfg!(target_os = "macos");
+    let switch_mods: Vec<String> = if mac {
+        vec!["cmd".into()]
+    } else {
+        vec!["alt".into()]
+    };
+    let custom_mods: Vec<String> = if mac {
+        vec!["ctrl".into()]
+    } else {
+        vec!["meta".into()]
+    };
+    let custom_key = if mac { "up" } else { "tab" };
+    vec![
+        KeySlot {
+            id: "k1".into(),
+            label: "回车".into(),
+            key: "enter".into(),
+            modifiers: vec![],
+        },
+        KeySlot {
+            id: "k2".into(),
+            label: "删除".into(),
+            key: "backspace".into(),
+            modifiers: vec![],
+        },
+        KeySlot {
+            id: "k3".into(),
+            label: "esc".into(),
+            key: "escape".into(),
+            modifiers: vec![],
+        },
+        KeySlot {
+            id: "k4".into(),
+            label: "切换".into(),
+            key: "tab".into(),
+            modifiers: switch_mods,
+        },
+        KeySlot {
+            id: "k5".into(),
+            label: "自定义".into(),
+            key: custom_key.into(),
+            modifiers: custom_mods,
+        },
+    ]
 }
 
 pub fn now_ms() -> u64 {

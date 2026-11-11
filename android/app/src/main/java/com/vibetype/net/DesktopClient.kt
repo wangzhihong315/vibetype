@@ -43,6 +43,17 @@ sealed interface ConnState {
  * 桌面端的 TCP 长连接。断线自动重连，指数退避。
  * 只有文字过网，音频不出手机。
  */
+/** 手机底部按键：标签由桌面端下发，点下去只回传 id。 */
+data class KeySlot(val id: String, val label: String)
+
+private val defaultKeymap = listOf(
+    KeySlot("k1", "回车"),
+    KeySlot("k2", "删除"),
+    KeySlot("k3", "esc"),
+    KeySlot("k4", "切换"),
+    KeySlot("k5", "自定义"),
+)
+
 class DesktopClient(private val settings: PairingStore) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -53,6 +64,9 @@ class DesktopClient(private val settings: PairingStore) {
     private val writeLock = Any()
 
     private val pending = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+
+    private val _keymap = MutableStateFlow(defaultKeymap)
+    val keymap: StateFlow<List<KeySlot>> = _keymap.asStateFlow()
 
     private val _state = MutableStateFlow<ConnState>(ConnState.Idle)
     val state: StateFlow<ConnState> = _state.asStateFlow()
@@ -165,6 +179,19 @@ class DesktopClient(private val settings: PairingStore) {
         }
     }
 
+    /** 桌面上改了键位会推过来，手机不用重连。 */
+    private fun applyKeymap(json: JSONObject) {
+        val keys = json.optJSONArray("keys") ?: return
+        if (keys.length() == 0) return
+        val parsed = (0 until keys.length()).mapNotNull { index ->
+            val item = keys.optJSONObject(index) ?: return@mapNotNull null
+            val id = item.optString("id")
+            val label = item.optString("label")
+            if (id.isBlank() || label.isBlank()) null else KeySlot(id, label)
+        }
+        if (parsed.size == 5) _keymap.value = parsed
+    }
+
     private suspend fun loop() {
         var backoff = 1_000L
         while (coroutineContext.isActive) {
@@ -264,8 +291,11 @@ class DesktopClient(private val settings: PairingStore) {
                     settings.token = issued
                 }
                 if (platform.isNotBlank()) settings.desktopName = platform
+                applyKeymap(json)
                 _state.value = ConnState.Connected(server, platform)
             }
+
+            "keymap" -> applyKeymap(json)
 
             "error" -> {
                 val code = json.optString("code", "error")

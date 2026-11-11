@@ -1014,3 +1014,72 @@ button.cmd {
 button.cmd .link {
   flex: 0 0 auto;
 }
+
+/* 手机按键编辑 */
+.keys-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.key-label,
+.key-select {
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12px;
+  padding: 0 8px;
+  font-family: inherit;
+}
+
+.key-label {
+  width: 76px;
+  flex: 0 0 76px;
+}
+
+.key-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.mods {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.mod {
+  width: 28px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 11px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.mod.on {
+  background: rgba(10, 132, 255, 0.12);
+  color: var(--blue);
+}
+
+.save-keys {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.quick:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

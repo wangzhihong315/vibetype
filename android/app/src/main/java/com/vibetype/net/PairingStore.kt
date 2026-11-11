@@ -41,6 +41,16 @@ class PairingStore(context: Context) {
         get() = prefs.getBoolean("seenGestures", false)
         set(value) = prefs.edit().putBoolean("seenGestures", value).apply()
 
+    /** 指针速度倍率：0.6 慢，1.0 标准，2.0 快。 */
+    var pointerSpeed: Float
+        get() = prefs.getFloat("pointerSpeed", 1f)
+        set(value) = prefs.edit().putFloat("pointerSpeed", value).apply()
+
+    /** 自然滚动：手指上滑内容跟着上走。 */
+    var naturalScroll: Boolean
+        get() = prefs.getBoolean("naturalScroll", true)
+        set(value) = prefs.edit().putBoolean("naturalScroll", value).apply()
+
     val paired: Boolean
         get() = !host.isNullOrBlank() && !token.isNullOrBlank()
 

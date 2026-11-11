@@ -66,6 +66,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val level: StateFlow<Float> = recorder.level
     val connection: StateFlow<ConnState> = client.state
+    val keymap = client.keymap
 
     private val _model = MutableStateFlow<ModelState>(ModelState.Missing)
     val model: StateFlow<ModelState> = _model.asStateFlow()
@@ -91,6 +92,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _leftHanded = MutableStateFlow(settings.leftHanded)
     val leftHanded: StateFlow<Boolean> = _leftHanded.asStateFlow()
+
+    private val _pointerSpeed = MutableStateFlow(settings.pointerSpeed)
+    val pointerSpeed: StateFlow<Float> = _pointerSpeed.asStateFlow()
+
+    private val _naturalScroll = MutableStateFlow(settings.naturalScroll)
+    val naturalScroll: StateFlow<Boolean> = _naturalScroll.asStateFlow()
 
     private var asr: XAsr? = null
 
@@ -445,6 +452,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setLeftHanded(value: Boolean) {
         settings.leftHanded = value
         _leftHanded.value = value
+    }
+
+    fun setPointerSpeed(value: Float) {
+        val clamped = value.coerceIn(0.6f, 2f)
+        settings.pointerSpeed = clamped
+        _pointerSpeed.value = clamped
+    }
+
+    fun setNaturalScroll(value: Boolean) {
+        settings.naturalScroll = value
+        _naturalScroll.value = value
+    }
+
+    /** 结果卡看一会儿就收起来，失败时留着。 */
+    fun clearLast() {
+        if (_last.value?.ack != AckState.Failed) {
+            _last.value = null
+        }
+        _partial.value = if (_recording.value) _partial.value else ""
     }
 
     fun gesturesSeen(): Boolean = settings.seenGestures
