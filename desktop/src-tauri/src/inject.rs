@@ -514,7 +514,6 @@ fn resolve_exe(target: &str) -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn focus_process(stem: &str) -> bool {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
@@ -562,7 +561,7 @@ fn focus_process(stem: &str) -> bool {
 
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if snapshot == 0 || snapshot == -1 {
+        if snapshot.is_null() || snapshot as isize == -1 {
             return false;
         }
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
