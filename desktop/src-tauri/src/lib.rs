@@ -173,13 +173,13 @@ fn reset_keymap(state: tauri::State<'_, state::AppState>) -> state::UiState {
 
 #[tauri::command]
 fn install_skill(target: String) -> Result<String, String> {
-    let home = std::env::var("HOME").map_err(|_| "找不到 HOME".to_string())?;
+    let home = std::env::var("HOME").map_err(|_| "HOME not found / 找不到 HOME".to_string())?;
     let dir = match target.as_str() {
         "claude" => format!("{home}/.claude/skills/vibetype-capsules"),
         "zcode" => format!("{home}/.agents/skills/vibetype-capsules"),
         "opencode" => format!("{home}/.config/opencode/skills/vibetype-capsules"),
         "codex" => format!("{home}/.codex/skills/vibetype-capsules"),
-        _ => return Err("不支持的客户端".into()),
+        _ => return Err("Unsupported client / 不支持的客户端".into()),
     };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = format!("{dir}/SKILL.md");

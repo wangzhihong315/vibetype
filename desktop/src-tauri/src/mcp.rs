@@ -31,12 +31,10 @@ fn default_status() -> String {
 
 const SKILL: &str = include_str!("../../../skills/vibetype-capsules/SKILL.md");
 
-const INSTRUCTIONS: &str = "VibeType 是手机上的闪念胶囊：用户按一下胶囊键说一句话，\
-本地转成文字，连上电脑时同步到桌面。胶囊是灵感收件箱，不是待办，也不是笔记终稿。\n\
-建议流程：先用 capsules_list 取 status=new 的胶囊，按主题归纳、指出可以立刻做的点；\
-信息不够就问一个问题；用户确认后再用 capsules_mark 标成 used。需要把结果放回用户\
-正在写的地方时用 text_type。不要替用户批量标记，也不要主动删除胶囊。\
-完整说明见资源 vibetype://skill。";
+const INSTRUCTIONS: &str = r#"VibeType is a thought-capsule inbox on the phone. The user holds the capsule key, speaks one thought, and the phone transcribes it locally; capsules sync to the desktop when connected. A capsule is raw material — not a todo, not a finished note.
+Suggested flow: call capsules_list with status=new, group related items into a few threads, and point out what can be done now versus what still needs context. Ask one question if information is missing. Only after the user confirms, call capsules_mark with those ids. Use text_type to put the result back where the user is writing. Never batch-mark or delete without explicit consent.
+Full guide: vibetype://skill.
+闪念胶囊是手机上的灵感收件箱，不是待办。按住胶囊键说一句，手机本地转写，连电脑时同步。先用 capsules_list 取 status=new，归纳后让用户确认，再用 capsules_mark 标记；需要落回文档时用 text_type。完整说明见 vibetype://skill。"#;
 
 /// 和 Tauri 的 app_config_dir 保持一致。
 fn config_dir() -> Option<PathBuf> {
@@ -91,22 +89,22 @@ fn tools() -> Vec<Value> {
     let mut list = vec![
         tool(
             "capsules_list",
-            "列出闪念胶囊。默认只给还没消化的（status=new），按时间新到旧。",
+            "List thought capsules. Returns unprocessed (status=new) newest first by default. 列出闪念胶囊，默认只给未消化的。",
             json!({
                 "type": "object",
                 "properties": {
                     "status": {
                         "type": "string",
                         "enum": ["new", "used", "all"],
-                        "description": "按状态过滤，默认 new"
+                        "description": "Filter by status; default new / 按状态过滤，默认 new"
                     },
-                    "limit": { "type": "number", "description": "最多返回几条，默认 20" }
+                    "limit": { "type": "number", "description": "Max items; default 20 / 最多返回几条" }
                 }
             }),
         ),
         tool(
             "capsules_get",
-            "按 id 取一条胶囊的全文和时间。",
+            "Read one capsule by id. 按 id 取一条胶囊的全文和时间。",
             json!({
                 "type": "object",
                 "properties": { "id": { "type": "string" } },
@@ -115,14 +113,14 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "capsules_mark",
-            "把胶囊标成已消化（used）或重新放回收件箱（new）。用户确认后再调用。",
+            "Mark capsules as used (digested) or move them back to new. Call only after the user confirms. 用户确认后再标记。",
             json!({
                 "type": "object",
                 "properties": {
                     "ids": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "要标记的胶囊 id"
+                        "description": "Capsule ids to mark / 要标记的胶囊 id"
                     },
                     "status": { "type": "string", "enum": ["used", "new"] }
                 },
@@ -131,7 +129,7 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "capsules_create",
-            "新建一条胶囊。仅在用户明确说「记一下」时使用。",
+            "Create a capsule. Only when the user explicitly asks to note something. 仅在用户明确说「记一下」时使用。",
             json!({
                 "type": "object",
                 "properties": { "text": { "type": "string" } },
@@ -140,7 +138,7 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "capsules_delete",
-            "按 id 删除一条胶囊。删除前必须得到用户明确同意。",
+            "Delete a capsule by id. Requires explicit user consent. 删除前必须得到用户明确同意。",
             json!({
                 "type": "object",
                 "properties": { "id": { "type": "string" } },
@@ -149,7 +147,7 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "text_type",
-            "把文字打到用户当前光标所在的应用里（整理结果落回文档）。",
+            "Type text into the app at the cursor, so the result lands back in the document. 把文字打到当前光标。",
             json!({
                 "type": "object",
                 "properties": { "text": { "type": "string" } },
@@ -160,7 +158,7 @@ fn tools() -> Vec<Value> {
     if keys_allowed() {
         list.push(tool(
             "keys_press",
-            "按一个键：enter / delete / esc / switch。默认关闭，需在 VibeType 里打开。",
+            "Press a key: enter / delete / esc / switch. Off by default; enable it in VibeType. 默认关闭，需在 VibeType 里打开。",
             json!({
                 "type": "object",
                 "properties": {
@@ -184,12 +182,12 @@ fn tool(name: &str, description: &str, schema: Value) -> Value {
 fn prompts() -> Vec<Value> {
     vec![json!({
         "name": "organize_capsules",
-        "title": "整理闪念胶囊",
-        "description": "取未消化的胶囊，按主题归纳，给出最多三个下一步，等用户确认后再标记 used。",
+        "title": "Organize capsules / 整理闪念胶囊",
+        "description": "Take unprocessed capsules, group by theme, give at most three next steps, and mark used only after the user confirms. / 取未消化的胶囊，按主题归纳，最多三个下一步，确认后再标记。",
         "arguments": [
             {
                 "name": "focus",
-                "description": "可选：这次只关心哪一类（比如产品、写作、家里的杂事）",
+                "description": "Optional: focus on one area (product, writing, errands). / 可选：这次只关心哪一类",
                 "required": false
             }
         ]
@@ -198,21 +196,21 @@ fn prompts() -> Vec<Value> {
 
 fn prompt_messages(focus: Option<&str>) -> Value {
     let focus_line = focus
-        .map(|value| format!("这次只看和「{value}」有关的。"))
+        .map(|value| format!("Only look at items related to \"{value}\" .\n"))
         .unwrap_or_default();
     json!({
-        "description": "整理闪念胶囊",
+        "description": "Organize capsules / 整理闪念胶囊",
         "messages": [
             {
                 "role": "user",
                 "content": {
                     "type": "text",
                     "text": format!(
-                        "帮我整理一下闪念胶囊。{focus_line}\n\
-                         先调用 capsules_list，status 用 new。把内容相近的合并成几条线索，\
-                         指出哪些可以马上做、哪些还缺信息。\n\
-                         最多给我三个下一步，并说明哪个最值得今天做。\n\
-                         我确认之后，你再调用 capsules_mark 把对应的 id 标成 used。"
+                        "Help me organize my thought capsules.\n{focus_line}\
+                         First call capsules_list with status=new. Merge related items into a few threads, \
+                         and point out what can be done now versus what still needs context.\n\
+                         Give me at most three next steps, and say which one is worth doing today.\n\
+                         After I confirm, call capsules_mark to mark those ids used. Reply in my language."
                     )
                 }
             }
@@ -230,7 +228,7 @@ fn text_result(text: String, is_error: bool) -> Value {
 fn json_result(value: Value) -> Value {
     match serde_json::to_string_pretty(&value) {
         Ok(text) => text_result(text, false),
-        Err(_) => text_result("序列化失败".into(), true),
+        Err(_) => text_result("Serialization failed".into(), true),
     }
 }
 
@@ -255,9 +253,9 @@ fn call(name: &str, args: &Value) -> Value {
             if items.is_empty() {
                 return text_result(
                     if status == "new" {
-                        "收件箱是空的，没有未消化的胶囊。".into()
+                        "The inbox is empty — no unprocessed capsules.".into()
                     } else {
-                        "没有符合条件的胶囊。".into()
+                        "No capsules matched.".into()
                     },
                     false,
                 );
@@ -287,7 +285,7 @@ fn call(name: &str, args: &Value) -> Value {
                     "used_at": item.used_at,
                     "text": item.text,
                 })),
-                None => text_result("没找到这条胶囊。".into(), true),
+                None => text_result("Capsule not found.".into(), true),
             }
         }
         "capsules_mark" => {
@@ -305,7 +303,7 @@ fn call(name: &str, args: &Value) -> Value {
                 .and_then(|v| v.as_str())
                 .unwrap_or("used");
             if ids.is_empty() {
-                return text_result("ids 不能为空。".into(), true);
+                return text_result("ids must not be empty.".into(), true);
             }
             let next = if status == "new" { "new" } else { "used" };
             let mut items = capsules();
@@ -319,10 +317,10 @@ fn call(name: &str, args: &Value) -> Value {
                 }
             }
             if changed == 0 {
-                return text_result("这些 id 都不存在。".into(), true);
+                return text_result("None of those ids exist.".into(), true);
             }
             write_json("capsules.json", &items);
-            text_result(format!("已把 {changed} 条标记为 {next}。"), false)
+            text_result(format!("Marked {changed} capsule(s) as {next}."), false)
         }
         "capsules_create" => {
             let text = args
@@ -332,7 +330,7 @@ fn call(name: &str, args: &Value) -> Value {
                 .trim()
                 .to_string();
             if text.is_empty() {
-                return text_result("text 不能为空。".into(), true);
+                return text_result("text must not be empty.".into(), true);
             }
             let mut items = capsules();
             let id = format!("mcp-{}", random_hex());
@@ -349,7 +347,7 @@ fn call(name: &str, args: &Value) -> Value {
             );
             items.truncate(200);
             write_json("capsules.json", &items);
-            text_result(format!("已新建胶囊 {id}"), false)
+            text_result(format!("Created capsule {id}"), false)
         }
         "capsules_delete" => {
             let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -357,34 +355,34 @@ fn call(name: &str, args: &Value) -> Value {
             let before = items.len();
             items.retain(|item| item.id != id);
             if items.len() == before {
-                return text_result("没找到这条胶囊。".into(), true);
+                return text_result("Capsule not found.".into(), true);
             }
             write_json("capsules.json", &items);
-            text_result("已删除。".into(), false)
+            text_result("Deleted.".into(), false)
         }
         "text_type" => {
             let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
             if text.is_empty() {
-                return text_result("text 不能为空。".into(), true);
+                return text_result("text must not be empty.".into(), true);
             }
             if inject::type_text(text) {
-                text_result("已打到光标。".into(), false)
+                text_result("Typed at the cursor.".into(), false)
             } else {
-                text_result("没有上屏权限，去系统设置里授权。".into(), true)
+                text_result("No typing permission. Grant Accessibility in System Settings.".into(), true)
             }
         }
         "keys_press" => {
             if !keys_allowed() {
-                return text_result("按键控制在 VibeType 里是关闭的。".into(), true);
+                return text_result("Key control is disabled in VibeType.".into(), true);
             }
             let key = args.get("key").and_then(|v| v.as_str()).unwrap_or("");
             if inject::press_key(key) {
-                text_result(format!("已按 {key}"), false)
+                text_result(format!("Pressed {key}"), false)
             } else {
-                text_result(format!("不认识的键：{key}"), true)
+                text_result(format!("Unknown key: {key}"), true)
             }
         }
-        _ => text_result(format!("没有这个工具：{name}"), true),
+        _ => text_result(format!("No such tool: {name}"), true),
     }
 }
 
@@ -488,9 +486,9 @@ pub fn serve() {
                             "resources": [{
                                 "uri": "vibetype://skill",
                                 "name": "vibetype-capsules",
-                                "title": "闪念胶囊 Skill",
+                                "title": "VibeType capsules Skill / 闪念胶囊 Skill",
                                 "mimeType": "text/markdown",
-                                "description": "给 Agent 的胶囊使用说明：这是什么、为什么这样设计、标准流程与边界。"
+                                "description": "Agent guide to capsules: what they are, why they work this way, the standard flow and boundaries. / 给 Agent 的胶囊使用说明。"
                             }]
                         }),
                     );
@@ -500,7 +498,7 @@ pub fn serve() {
                 let Some(id) = &id else { continue };
                 let uri = params.get("uri").and_then(|v| v.as_str()).unwrap_or("");
                 if uri != "vibetype://skill" {
-                    respond_error(id, -32602, "没有这个资源");
+                    respond_error(id, -32602, "No such resource");
                     continue;
                 }
                 respond(

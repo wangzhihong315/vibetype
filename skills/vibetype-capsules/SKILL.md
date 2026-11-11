@@ -1,6 +1,54 @@
 ---
 name: vibetype-capsules
-description: 读取、归纳和消化 VibeType 的闪念胶囊。用户提到「胶囊」「闪念」「灵感」「我刚想到的」「记一下」时使用。
+description: Read, digest and act on VibeType thought capsules. Use when the user mentions a capsule, thought, idea, "I just thought of", "note this" — or 胶囊 / 闪念 / 灵感 / 我刚想到的 / 记一下.
+---
+
+# VibeType capsules
+
+## What this is
+
+VibeType is a voice-first thought tool on the phone. The user holds the capsule key, says one
+thing, and the phone transcribes it locally into a capsule. Capsules sync to the desktop when
+connected. A capsule is an **inbox of raw thoughts**: it has no category, no due date, and it
+does not mean the user committed to doing it.
+
+## Why it works this way
+
+The starting point is Smartisan's idea pills: thoughts arrive fast and leave fast. Unlocking the
+phone, finding an app, creating a note and typing are already enough steps for someone to give
+up. So there is one key: press it, speak, and sort it out later.
+
+That leads to three rules:
+
+- A capsule is **raw material**, not a todo and not a finished note. Don't turn every one into a task.
+- The user may speak half a sentence with no context. Reconstruct what they were thinking; don't read it literally.
+- The value is in the **next step**, not in filing. Sorting without an action is not sorting.
+
+## Standard flow
+
+1. `capsules_list` with `status: "new"`. Don't pull everything at once.
+2. Use `capsules_get` when you need the full text; list entries may be truncated.
+3. Synthesize: group by theme, point out repetition, contradictions and things that can be done
+   immediately. If information is missing, ask one question — don't invent a plan.
+4. After the user confirms, mark those ids `used` with `capsules_mark`. **Never mark on their behalf.**
+5. When the result belongs back in what they are writing, use `text_type` (types at the cursor).
+
+## When to create
+
+Only when the user says "note this", "don't forget", "put it in capsules": `capsules_create`.
+Don't stockpile capsules from the conversation on your own — the inbox belongs to the user.
+
+## Tone
+
+Short and concrete, like a reminder from a colleague. No "Here is a summary:" boilerplate.
+At most three next steps, and say which one is worth doing today.
+
+## Boundaries
+
+- Don't read transcript history: VibeType does not expose it over MCP.
+- Don't delete capsules without explicit consent.
+- `keys_press` is off by default; don't assume it is available.
+
 ---
 
 # 闪念胶囊
