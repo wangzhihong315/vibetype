@@ -111,6 +111,26 @@ class DesktopClient(private val settings: PairingStore) {
      * 发一段文字，等桌面端 ack。返回 false 表示没发出去、5 秒没确认，
      * 或桌面端两种注入都失败。失败不重发，避免同一段话上屏两次。
      */
+    /** 胶囊只是抄一份到电脑，方便桌面查看和 MCP 读取；丢了也不影响手机上的原件。 */
+    fun sendCapsule(id: String, text: String, createdAt: Long, durationMs: Int) {
+        val out = writer ?: return
+        if (_state.value !is ConnState.Connected) return
+        val frame = JSONObject()
+            .put("t", "capsule")
+            .put("id", id)
+            .put("text", text)
+            .put("createdAt", createdAt)
+            .put("ms", durationMs)
+            .toString()
+        scope.launch {
+            try {
+                writeLine(out, frame)
+            } catch (e: Exception) {
+                Log.w(TAG, "sendCapsule failed: ${e.message}")
+            }
+        }
+    }
+
     suspend fun sendText(text: String, durationMs: Int, lang: String): Boolean {
         val out = writer ?: return false
         if (_state.value !is ConnState.Connected) return false

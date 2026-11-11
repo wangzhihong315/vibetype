@@ -8,7 +8,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
     pub text: String,
@@ -33,6 +33,25 @@ impl Entry {
 }
 
 #[derive(Clone, Serialize)]
+pub struct DeviceView {
+    pub id: String,
+    pub name: String,
+    pub platform: String,
+    pub last_seen: u64,
+    pub online: bool,
+}
+
+/// 手机上存下来的闪念；桌面只是留一份，方便查看和用 MCP 读。
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Capsule {
+    pub id: String,
+    pub text: String,
+    pub at: u64,
+    #[serde(default)]
+    pub duration_ms: u32,
+}
+
+#[derive(Clone, Serialize)]
 pub struct UiState {
     pub address: String,
     pub port: u16,
@@ -44,15 +63,20 @@ pub struct UiState {
     pub connected: u32,
     pub device: String,
     pub platform: String,
+    pub devices: Vec<DeviceView>,
+    pub capsules: Vec<Capsule>,
+    pub mcp_keys: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Device {
     pub token: String,
-    #[allow(dead_code)]
+    #[serde(default)]
     pub name: String,
-    #[allow(dead_code)]
+    #[serde(default)]
     pub platform: String,
+    #[serde(default)]
+    pub last_seen: u64,
 }
 
 pub struct Inner {
@@ -63,6 +87,7 @@ pub struct Inner {
     pub prev_code: String,
     pub qr_svg: String,
     pub devices: Vec<Device>,
+    pub capsules: Vec<Capsule>,
     pub history: Vec<Entry>,
     pub injection: String,
     pub connected: u32,
@@ -87,6 +112,8 @@ impl AppState {
     pub fn new(app: AppHandle) -> Self {
         let code = new_code();
         let devices = load_devices(&app);
+        let capsules = load_json::<Vec<Capsule>>(&app, "capsules.json").unwrap_or_default();
+        let history = load_json::<Vec<Entry>>(&app, "history.json").unwrap_or_default();
         let injection = match std::env::var("VIBETYPE_INJECT").as_deref() {
             Ok("paste") => "paste",
             _ => "type",
@@ -98,7 +125,8 @@ impl AppState {
             code,
             prev_code: String::new(),
             devices,
-            history: Vec::new(),
+            capsules,
+            history,
             injection: injection.to_string(),
             connected: 0,
             device: String::new(),
@@ -126,6 +154,21 @@ impl AppState {
             connected: inner.connected,
             device: inner.device.clone(),
             platform: std::env::consts::OS.to_string(),
+            devices: inner
+                .devices
+                .iter()
+                .map(|d| DeviceView {
+                    id: device_id(&d.token),
+                    name: d.name.clone(),
+                    platform: d.platform.clone(),
+                    last_seen: d.last_seen,
+                    online: inner.connected > 0
+                        && !d.name.is_empty()
+                        && d.name == inner.device,
+                })
+                .collect(),
+            capsules: inner.capsules.clone(),
+            mcp_keys: mcp_keys_enabled(&self.app),
         }
     }
 
@@ -196,6 +239,7 @@ impl AppState {
                 token: token.clone(),
                 name: name.to_string(),
                 platform: platform.to_string(),
+                last_seen: now_ms(),
             });
             save_devices(&self.app, &inner.devices);
         }
@@ -219,6 +263,80 @@ impl AppState {
     }
 
     /// 撤销所有已配对设备，手机下次连接必须重新输配对码。
+    /// 连接时记一下时间，设备页显示「刚刚在线」用。
+    pub fn touch_device(&self, token: &str) {
+        let changed = {
+            let mut inner = self.lock();
+            let mut changed = false;
+            for device in inner.devices.iter_mut() {
+                if secure_eq(token, &device.token) {
+                    device.last_seen = now_ms();
+                    changed = true;
+                }
+            }
+            changed
+        };
+        if changed {
+            let devices = self.lock().devices.clone();
+            save_devices(&self.app, &devices);
+            self.emit_state();
+        }
+    }
+
+    pub fn revoke_device(&self, id: &str) {
+        {
+            let mut inner = self.lock();
+            inner.devices.retain(|d| device_id(&d.token) != id);
+            if inner.device.is_empty() || !inner.devices.iter().any(|d| d.name == inner.device) {
+                inner.device.clear();
+            }
+            save_devices(&self.app, &inner.devices);
+        }
+        self.emit_state();
+    }
+
+    pub fn push_capsule(&self, capsule: Capsule) {
+        {
+            let mut inner = self.lock();
+            inner.capsules.retain(|c| c.id != capsule.id);
+            inner.capsules.insert(0, capsule);
+            inner.capsules.truncate(200);
+            save_json(&self.app, "capsules.json", &inner.capsules);
+        }
+        self.emit_state();
+    }
+
+    /// MCP 进程也会往 capsules.json 里写，定时把文件读回来。
+    pub fn reload_capsules(&self) {
+        let Some(items) = load_json::<Vec<Capsule>>(&self.app, "capsules.json") else {
+            return;
+        };
+        {
+            let mut inner = self.lock();
+            if inner.capsules.len() == items.len()
+                && inner.capsules.iter().zip(items.iter()).all(|(a, b)| a.id == b.id && a.text == b.text)
+            {
+                return;
+            }
+            inner.capsules = items;
+        }
+        self.emit_state();
+    }
+
+    pub fn remove_capsule(&self, id: &str) {
+        {
+            let mut inner = self.lock();
+            inner.capsules.retain(|c| c.id != id);
+            save_json(&self.app, "capsules.json", &inner.capsules);
+        }
+        self.emit_state();
+    }
+
+    pub fn set_mcp_keys(&self, enabled: bool) {
+        write_mcp_keys(&self.app, enabled);
+        self.emit_state();
+    }
+
     pub fn revoke_devices(&self) {
         {
             let mut inner = self.lock();
@@ -234,6 +352,7 @@ impl AppState {
             let mut inner = self.lock();
             inner.history.insert(0, entry.clone());
             inner.history.truncate(50);
+            save_json(&self.app, "history.json", &inner.history);
         }
         let _ = self.app.emit("text", &entry);
         self.emit_state();
@@ -243,9 +362,27 @@ impl AppState {
         {
             let mut inner = self.lock();
             inner.history.clear();
+            save_json(&self.app, "history.json", &inner.history);
         }
         self.emit_state();
     }
+}
+
+pub fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// 设备列表里给前端一个稳定的短 id，别把长期 token 递进网页。
+fn device_id(token: &str) -> String {
+    let mut hash: u32 = 0x811c9dc5;
+    for byte in token.as_bytes() {
+        hash ^= *byte as u32;
+        hash = hash.wrapping_mul(0x01000193);
+    }
+    format!("{hash:08x}")
 }
 
 fn new_code() -> String {
@@ -257,12 +394,58 @@ fn new_token() -> String {
     hex::encode(bytes)
 }
 
-/// 已配对设备存在用户配置目录，桌面端重启后手机不用重新配对。
+/// 已配对设备、胶囊和历史都存在用户配置目录，重启后还在。
+pub fn config_path(app: &AppHandle, name: &str) -> Option<std::path::PathBuf> {
+    app.path().app_config_dir().ok().map(|dir| dir.join(name))
+}
+
 fn devices_path(app: &AppHandle) -> Option<std::path::PathBuf> {
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|dir| dir.join("devices.json"))
+    config_path(app, "devices.json")
+}
+
+fn load_json<T: serde::de::DeserializeOwned>(app: &AppHandle, name: &str) -> Option<T> {
+    let path = config_path(app, name)?;
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn save_json<T: Serialize>(app: &AppHandle, name: &str, value: &T) {
+    let Some(path) = config_path(app, name) else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(value) {
+        let _ = fs::write(path, text);
+    }
+}
+
+fn mcp_config_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    config_path(app, "mcp.json")
+}
+
+fn mcp_keys_enabled(app: &AppHandle) -> bool {
+    let Some(path) = mcp_config_path(app) else {
+        return false;
+    };
+    let Ok(text) = fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return false;
+    };
+    value.get("allowKeys").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+fn write_mcp_keys(app: &AppHandle, enabled: bool) {
+    let Some(path) = mcp_config_path(app) else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    let _ = fs::write(path, serde_json::json!({ "allowKeys": enabled }).to_string());
 }
 
 fn load_devices(app: &AppHandle) -> Vec<Device> {

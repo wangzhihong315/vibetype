@@ -253,6 +253,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val text = corrector.correct(raw).text
             val capsule = capsuleStore.add(text, durationMs)
+            client.sendCapsule(capsule.id, capsule.text, capsule.createdAt, capsule.durationMs)
             _capsuleSaving.value = false
             _capsuleSaved.tryEmit(capsule)
         }
@@ -375,9 +376,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val corrected = corrector.correct(raw)
             _last.value = Transcript(corrected.text, elapsed, "zh", AckState.Pending, corrected.changes)
-            val delivered = client.sendText(corrected.text, pcm.size * 1000 / Recorder.SAMPLE_RATE, "zh")
-            _last.value = _last.value?.copy(
-                ack = if (delivered) AckState.Delivered else AckState.Failed
+            val audioMs = pcm.size * 1000 / Recorder.SAMPLE_RATE
+            _notice.value = "自检 · 音频 %.1fs · 转写 %dms · RTF %.2f".format(
+                audioMs / 1000.0, elapsed, elapsed.toDouble() / audioMs
             )
             _busy.value = false
         }

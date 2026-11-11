@@ -8,7 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
 
 use crate::inject;
-use crate::state::{AppState, Entry, TokenKind};
+use crate::state::{now_ms, AppState, Capsule, Entry, TokenKind};
 
 const PROTOCOL_VERSION: u32 = 1;
 const IDLE_TIMEOUT: Duration = Duration::from_secs(180);
@@ -51,6 +51,9 @@ struct Frame {
     // 固定按键
     #[serde(default)]
     name: String,
+    // 胶囊
+    #[serde(default, rename = "createdAt")]
+    created_at: u64,
 }
 
 /// 监听局域网，直到进程退出。端口从 47823 开始顺延。
@@ -134,6 +137,9 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
     } else {
         None
     };
+    if kind == TokenKind::Device {
+        state.touch_device(&hello.token);
+    }
 
     let welcome = json!({
         "t": "welcome",
@@ -195,6 +201,27 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
                     inject::pointer(&action, &button, dx, dy);
                 })
                 .await;
+            }
+            "capsule" => {
+                let text = frame.text.trim().to_string();
+                if !text.is_empty() {
+                    let id = if frame.id.is_empty() {
+                        Entry::new(&text, "capsule").id
+                    } else {
+                        frame.id.clone()
+                    };
+                    let at = if frame.created_at > 0 {
+                        frame.created_at
+                    } else {
+                        now_ms()
+                    };
+                    state.push_capsule(Capsule {
+                        id,
+                        text,
+                        at,
+                        duration_ms: frame.duration_ms,
+                    });
+                }
             }
             "key" => {
                 #[cfg(debug_assertions)]

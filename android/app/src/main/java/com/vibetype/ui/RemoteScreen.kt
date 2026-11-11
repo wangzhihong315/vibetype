@@ -209,7 +209,12 @@ fun RemoteScreen(
         SettingsSheet(
             conn = conn,
             leftHanded = leftHanded,
+            debuggable = vm.debuggable,
             onDismiss = { showSettings = false },
+            onSelfTest = {
+                showSettings = false
+                vm.selfTest()
+            },
             onToggleLeftHanded = vm::setLeftHanded,
             onShowGestures = {
                 showSettings = false
@@ -980,9 +985,11 @@ private fun KeyButton(
 private fun SettingsSheet(
     conn: ConnState,
     leftHanded: Boolean,
+    debuggable: Boolean,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
     onShowGestures: () -> Unit,
+    onSelfTest: () -> Unit,
     onUnpair: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1045,6 +1052,13 @@ private fun SettingsSheet(
             SettingsGroup("胶囊") {
                 SettingsRow(title = "保存位置", value = "这台手机")
                 SettingsRow(title = "转写", value = "手机本地")
+            }
+
+            if (debuggable) {
+                Spacer(Modifier.height(16.dp))
+                SettingsGroup("调试") {
+                    SettingsRow(title = "跑一段自检音频", value = "", onClick = onSelfTest)
+                }
             }
 
             Spacer(Modifier.height(22.dp))

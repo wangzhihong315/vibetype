@@ -1,4 +1,5 @@
 mod inject;
+pub mod mcp;
 mod server;
 mod state;
 
@@ -37,6 +38,30 @@ fn revoke_devices(state: tauri::State<'_, state::AppState>) -> state::UiState {
 }
 
 #[tauri::command]
+fn revoke_device(state: tauri::State<'_, state::AppState>, id: String) -> state::UiState {
+    state.revoke_device(&id);
+    state.snapshot()
+}
+
+#[tauri::command]
+fn remove_capsule(state: tauri::State<'_, state::AppState>, id: String) -> state::UiState {
+    state.remove_capsule(&id);
+    state.snapshot()
+}
+
+#[tauri::command]
+fn refresh_capsules(state: tauri::State<'_, state::AppState>) -> state::UiState {
+    state.reload_capsules();
+    state.snapshot()
+}
+
+#[tauri::command]
+fn set_mcp_keys(state: tauri::State<'_, state::AppState>, enabled: bool) -> state::UiState {
+    state.set_mcp_keys(enabled);
+    state.snapshot()
+}
+
+#[tauri::command]
 fn autostart_enabled(app: tauri::AppHandle) -> bool {
     app.autolaunch().is_enabled().unwrap_or(false)
 }
@@ -55,6 +80,15 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
 #[tauri::command]
 fn open_permission_settings() {
     inject::open_settings();
+}
+
+#[tauri::command]
+fn type_text(text: String) -> Result<(), String> {
+    if inject::type_text(&text) {
+        Ok(())
+    } else {
+        Err("没有上屏权限".into())
+    }
 }
 
 pub fn run() {
@@ -133,9 +167,14 @@ pub fn run() {
             set_injection,
             clear_history,
             revoke_devices,
+            revoke_device,
+            remove_capsule,
+            refresh_capsules,
+            set_mcp_keys,
             autostart_enabled,
             set_autostart,
-            open_permission_settings
+            open_permission_settings,
+            type_text
         ])
         .run(tauri::generate_context!())
         .expect("error while running VibeType");
