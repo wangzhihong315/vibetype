@@ -9,7 +9,7 @@
 | C1 | 配对与连接 | 二维码 / 六位码配对，换长期 deviceToken；心跳保活、断线重连、配对失效回退 | ✅ |
 | C2 | 本地语音识别 | X-ASR 960ms 流式 zh-en + 标点 + 热词；术语纠正层；粤语/日/韩切 SenseVoice | ✅ |
 | C3 | 文字上屏 | 按键注入（CGEvent / SendInput），失败退到剪贴板粘贴；ack 回报 | ✅ |
-| C4 | 胶囊存储与同步 | 手机录音、本地转写、本地持久化；保存时抄一份到桌面收件箱 | ✅ |
+| C4 | 胶囊存储与同步 | 手机录音、本地转写、本地持久化；保存时和每次连上都补发未同步的胶囊 | ✅ |
 | C5 | 模型管理 | 当前随 APK 打包；后续可独立更新模型 | ◐ |
 | C6 | 诊断 | debug 自检（内置录音跑全链路）、连接错误提示、版本信息 | ◐ |
 | C7 | 指针通道 | 手机触控板的移动 / 左键 / 右键 / 滚动（双指与边缘），走同一条 TCP 连接，桌面端转成鼠标事件 | ✅ |
@@ -43,14 +43,31 @@
 | D7 | 设置 | 上屏方式、开机自启、接收触控板、辅助功能、版本 | ✅ |
 | D8 | 托盘与提示 | 打开 / 暂停接收 / 退出；上屏失败 HUD | ◐ |
 
-### MCP 工具（五个，按键控制可开）
+### MCP：让 Agent 消化胶囊
+
+这一层参考锤子闪念胶囊的定位：手机负责「记」，Agent 负责「消化」。所以 MCP **不暴露转写历史**，
+只围绕胶囊：取未消化的 → 归纳 → 用户确认 → 标记已整理，需要时把结果打回光标。
 
 | 工具 | 作用 | 默认 |
 |---|---|---|
-| `transcripts_recent` | 读取最近的转写结果 | 开 |
-| `capsules_list/get/create/delete` | 读取与写入胶囊 | 开 |
-| `text_type` | 把文本打进当前光标 | 开 |
+| `capsules_list` | 列胶囊，默认 `status=new`，按时间新到旧 | 开 |
+| `capsules_get` | 取单条全文 | 开 |
+| `capsules_mark` | 标成 `used`（已整理）或放回 `new` | 开 |
+| `capsules_create` | 用户说「记一下」时新建 | 开 |
+| `capsules_delete` | 删除，需用户明确同意 | 开 |
+| `text_type` | 把整理结果打进当前光标 | 开 |
 | `keys_press` | 回车 / 删除 / Esc / 切换窗口 | 关（危险，App 里开） |
+
+胶囊状态：`new` 是收件箱，`used` 是已经消化。手机补发不会把 `used` 覆盖回 `new`。
+
+### 配套 Skill
+
+工具只解决「能调用」，Skill 解决「知道什么时候、按什么顺序用」：
+
+- **MCP 握手**：`initialize` 带 `instructions`，客户端不用额外配置就能理解产品和推荐流程；
+- **Prompt**：`prompts/list` 提供 `organize_capsules`，一句话触发「整理胶囊」；
+- **Resource**：`resources/read` 的 `vibetype://skill` 提供完整说明，支持资源的客户端可直接读；
+- **可安装**：设置页一键写入 `~/.claude/skills`、`~/.agents/skills`、`~/.config/opencode/skills`、`~/.codex/skills`。
 
 实现方式：桌面 App 带一个 `--mcp` 子命令，走 stdio JSON-RPC；配置片段由 D6 页一键复制。
 

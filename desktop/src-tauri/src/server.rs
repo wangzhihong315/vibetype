@@ -220,6 +220,8 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
                         text,
                         at,
                         duration_ms: frame.duration_ms,
+                        status: "new".into(),
+                        used_at: 0,
                     });
                 }
             }

@@ -49,6 +49,15 @@ pub struct Capsule {
     pub at: u64,
     #[serde(default)]
     pub duration_ms: u32,
+    /// new = 还没被 Agent 消化；used = 已经归纳/处理过。
+    #[serde(default = "default_status")]
+    pub status: String,
+    #[serde(default)]
+    pub used_at: u64,
+}
+
+fn default_status() -> String {
+    "new".into()
 }
 
 #[derive(Clone, Serialize)]
@@ -298,8 +307,19 @@ impl AppState {
     pub fn push_capsule(&self, capsule: Capsule) {
         {
             let mut inner = self.lock();
-            inner.capsules.retain(|c| c.id != capsule.id);
-            inner.capsules.insert(0, capsule);
+            // 手机重连后会把没同步过的胶囊再发一遍；已经消化过的状态不能被覆盖。
+            let previous = inner
+                .capsules
+                .iter()
+                .find(|item| item.id == capsule.id)
+                .map(|item| (item.status.clone(), item.used_at));
+            let mut incoming = capsule;
+            if let Some((status, used_at)) = previous {
+                incoming.status = status;
+                incoming.used_at = used_at;
+            }
+            inner.capsules.retain(|c| c.id != incoming.id);
+            inner.capsules.insert(0, incoming);
             inner.capsules.truncate(200);
             save_json(&self.app, "capsules.json", &inner.capsules);
         }
@@ -314,7 +334,11 @@ impl AppState {
         {
             let mut inner = self.lock();
             if inner.capsules.len() == items.len()
-                && inner.capsules.iter().zip(items.iter()).all(|(a, b)| a.id == b.id && a.text == b.text)
+                && inner
+                    .capsules
+                    .iter()
+                    .zip(items.iter())
+                    .all(|(a, b)| a.id == b.id && a.text == b.text && a.status == b.status)
             {
                 return;
             }

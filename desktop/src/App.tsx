@@ -10,7 +10,14 @@ type Device = {
   last_seen: number;
   online: boolean;
 };
-type Capsule = { id: string; text: string; at: number; duration_ms: number };
+type Capsule = {
+  id: string;
+  text: string;
+  at: number;
+  duration_ms: number;
+  status?: string;
+  used_at?: number;
+};
 
 type UiState = {
   address: string;
@@ -63,26 +70,133 @@ const NAV: { id: Page; label: string; icon: string }[] = [
   },
 ];
 
-const CLIENTS: { id: string; label: string; args: string; path: string }[] = [
-  {
-    id: "claude",
-    label: "Claude Code",
-    args: "claude mcp add vibetype -- /Applications/VibeType.app/Contents/MacOS/vibetype --mcp",
-    path: "~/Library/Application Support/Claude/claude_desktop_config.json",
-  },
-  {
-    id: "zcode",
-    label: "ZCode",
-    args: "~/.zcode/config.json → mcpServers",
-    path: "~/.zcode/config.json",
-  },
-  {
-    id: "cursor",
-    label: "Cursor",
-    args: "~/.cursor/mcp.json",
-    path: "~/.cursor/mcp.json",
-  },
-];
+type McpClient = {
+  id: string;
+  label: string;
+  how: string;
+  cli?: string;
+  path: string;
+  snippet: string;
+};
+
+function binaryPath(platform: string) {
+  return platform === "windows"
+    ? "C:/Program Files/VibeType/VibeType.exe"
+    : "/Applications/VibeType.app/Contents/MacOS/vibetype";
+}
+
+function mcpClients(bin: string): McpClient[] {
+  return [
+    {
+      id: "claude",
+      label: "Claude Code",
+      how: "一条命令注册，或用 ~/.claude.json 里同样的 mcpServers 条目",
+      cli: `claude mcp add --transport stdio vibetype -- "${bin}" --mcp`,
+      path: "~/.claude.json（项目级 .mcp.json）",
+      snippet: `{
+  "mcpServers": {
+    "vibetype": {
+      "command": "${bin}",
+      "args": ["--mcp"]
+    }
+  }
+}`,
+    },
+    {
+      id: "codex",
+      label: "Codex",
+      how: "codex mcp add 写进 config.toml 的 [mcp_servers]",
+      cli: `codex mcp add vibetype -- "${bin}" --mcp`,
+      path: "~/.codex/config.toml",
+      snippet: `[mcp_servers.vibetype]
+command = "${bin}"
+args = ["--mcp"]
+enabled = true`,
+    },
+    {
+      id: "opencode",
+      label: "OpenCode",
+      how: "本地服务器用 type=local，命令是数组",
+      cli: `opencode mcp add vibetype -- "${bin}" --mcp --global`,
+      path: "~/.config/opencode/opencode.jsonc",
+      snippet: `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "vibetype": {
+        "type": "local",
+        "command": ["${bin}", "--mcp"],
+        "disabled": false
+      }
+    }
+  }
+}`,
+    },
+    {
+      id: "zcode",
+      label: "ZCode",
+      how: "在设置 → MCP 里加一条 stdio server，或直接写配置",
+      path: "~/.zcode/cli/config.json",
+      snippet: `{
+  "mcp": {
+    "servers": {
+      "vibetype": {
+        "command": "${bin}",
+        "args": ["--mcp"]
+      }
+    }
+  }
+}`,
+    },
+    {
+      id: "qwen",
+      label: "Qwen Code",
+      how: "和 Gemini CLI 同源，settings.json 里是 mcpServers",
+      cli: `qwen mcp add vibetype "${bin}" --mcp`,
+      path: "~/.qwen/settings.json",
+      snippet: `{
+  "mcpServers": {
+    "vibetype": {
+      "command": "${bin}",
+      "args": ["--mcp"]
+    }
+  }
+}`,
+    },
+    {
+      id: "dsh",
+      label: "DeepSeek Harness",
+      how: "dsh 用 Cordis overlay 声明 MCP，工具会显示成 mcp__vibetype__*",
+      cli: `dsh web --patch ~/.dsh/vibetype.cordis.yml`,
+      path: "$DSH_HOME/cordis.patch.yml（默认 ~/.dsh）",
+      snippet: `- insert:
+    - id: vibetype-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: vibetype
+        transport: stdio
+        command: "${bin}"
+        args: ["--mcp"]
+        env: {}`,
+    },
+    {
+      id: "workbuddy",
+      label: "WorkBuddy",
+      how: "mcp.json 里加一条 stdio，和 Claude 的格式基本一致",
+      path: "~/.workbuddy/mcp.json",
+      snippet: `{
+  "mcpServers": {
+    "vibetype": {
+      "type": "stdio",
+      "command": "${bin}",
+      "args": ["--mcp"],
+      "disabled": false
+    }
+  }
+}`,
+    },
+  ];
+}
 
 function modeLabel(mode: string) {
   if (mode === "type") return "直接打字";
@@ -138,6 +252,7 @@ export default function App() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [clientId, setClientId] = useState("claude");
 
   useEffect(() => {
     invoke<UiState>("ui_state").then(setState).catch(console.error);
@@ -229,6 +344,16 @@ export default function App() {
     }
   }
 
+  async function installSkill(target: string, label: string) {
+    try {
+      const path = await invoke<string>("install_skill", { target });
+      setFlash(`已装到 ${label}：${path}`);
+    } catch (error) {
+      console.error(error);
+      setFlash("装不进去，检查目录权限");
+    }
+  }
+
   async function toggleMcpKeys() {
     if (!state) return;
     setState(await invoke<UiState>("set_mcp_keys", { enabled: !state.mcp_keys }));
@@ -240,6 +365,8 @@ export default function App() {
 
   const connected = state.connected > 0;
   const onlineName = state.device || "手机";
+  const clients = mcpClients(binaryPath(state.platform));
+  const client = clients.find((item) => item.id === clientId) ?? clients[0];
 
   return (
     <div className="app">
@@ -271,11 +398,15 @@ export default function App() {
         <div className="sb-foot">
           <div className="row">
             <i className={connected ? "dot on" : "dot"} />
-            {connected ? `${onlineName} 已连接` : "等待手机连接"}
+            <span className="txt">
+              {connected ? `${onlineName} 已连接` : "等待手机连接"}
+            </span>
           </div>
           <div className="row">
             <i className={state.permission ? "dot ok" : "dot warn"} />
-            {state.permission ? "上屏权限已授权" : "缺上屏权限"}
+            <span className="txt">
+              {state.permission ? "上屏权限已授权" : "缺上屏权限"}
+            </span>
           </div>
           <span className="ver">v0.1.0</span>
         </div>
@@ -503,7 +634,12 @@ export default function App() {
                       className={capsule?.id === item.id ? "ientry on" : "ientry"}
                       onClick={() => setSelected(item.id)}
                     >
-                      <span className="t">{day(item.at)}</span>
+                      <span className="head">
+                        <span className="t">{day(item.at)}</span>
+                        <span className={item.status === "used" ? "tag ok" : "tag wait"}>
+                          {item.status === "used" ? "已整理" : "未整理"}
+                        </span>
+                      </span>
                       <span className="x">{item.text}</span>
                     </button>
                   ))}
@@ -511,7 +647,8 @@ export default function App() {
                 {capsule && (
                   <div className="inbox-detail">
                     <span className="t">
-                      {day(capsule.at)} · {duration(capsule.duration_ms)}
+                      {day(capsule.at)} · {duration(capsule.duration_ms)} ·{" "}
+                      {capsule.status === "used" ? "已整理" : "未整理"}
                     </span>
                     <div className="x">{capsule.text}</div>
                     {flash && <span className="flash">{flash}</span>}
@@ -541,7 +678,7 @@ export default function App() {
             <header className="page-head spread">
               <div>
                 <h1>MCP</h1>
-                <p>让 AI 客户端读你的转写和胶囊</p>
+                <p>让 Agent 帮你消化闪念胶囊</p>
               </div>
               <span className="wpill">
                 <i className="dot blue" />
@@ -553,30 +690,90 @@ export default function App() {
               <div className="card-head">
                 <div>
                   <h2>接入客户端</h2>
-                  <p className="sub">复制这段命令到终端，或在客户端里加一个 stdio server</p>
+                  <p className="sub">选一个客户端，照着命令或配置加一次</p>
                 </div>
-                <button
-                  className="link"
-                  onClick={() => copy(cliSnippet(state), "snippet")}
-                >
-                  {copied === "snippet" ? "已复制" : "复制配置"}
-                </button>
               </div>
-              <div className="tabs">
-                {CLIENTS.map((client) => (
-                  <span
-                    key={client.id}
-                    className={copied === client.id ? "tab on" : "tab"}
-                    onClick={() => copy(client.path, client.id)}
+
+              <div className="client-grid">
+                {clients.map((item) => (
+                  <button
+                    key={item.id}
+                    className={client.id === item.id ? "client on" : "client"}
+                    onClick={() => setClientId(item.id)}
                   >
-                    {client.label}
-                  </span>
+                    {item.label}
+                  </button>
                 ))}
               </div>
-              <pre className="codeblock">{jsonSnippet()}</pre>
+
+              <p className="how">{client.how}</p>
+
+              {client.cli && (
+                <div className="cmd">
+                  <code>{client.cli}</code>
+                  <button
+                    className="link"
+                    onClick={() => copy(client.cli!, `${client.id}-cli`)}
+                  >
+                    {copied === `${client.id}-cli` ? "已复制" : "复制命令"}
+                  </button>
+                </div>
+              )}
+
+              <div className="path-row">
+                <span className="k">配置文件</span>
+                <span className="v">{client.path}</span>
+                <button
+                  className="link"
+                  onClick={() => copy(client.snippet, `${client.id}-snip`)}
+                >
+                  {copied === `${client.id}-snip` ? "已复制" : "复制配置"}
+                </button>
+              </div>
+
+              <pre className="codeblock">{client.snippet}</pre>
+
               <p className="hint">
-                客户端会用它自己的权限启动 VibeType，所以上屏前请确认「辅助功能」已授权。
+                客户端用自己的权限启动 VibeType，上屏前请确认「辅助功能」已授权；
+                工具名形如 <code>mcp__vibetype__capsules_list</code>。
               </p>
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <div>
+                  <h2>配套 Skill</h2>
+                  <p className="sub">
+                    告诉 Agent 胶囊是什么、为什么这样设计、该按什么顺序消化
+                  </p>
+                </div>
+              </div>
+              <p className="how">
+                不装也能用：MCP 握手时会带一段说明，<code>vibetype://skill</code>{" "}
+                这个资源里是同一份全文。装成 Skill 后，客户端会在合适的时机自己想起来。
+              </p>
+              <div className="skill-row">
+                <button className="quick" onClick={() => installSkill("claude", "Claude Code")}>
+                  装到 Claude Code
+                </button>
+                <button className="quick" onClick={() => installSkill("zcode", "ZCode")}>
+                  装到 ZCode
+                </button>
+                <button className="quick" onClick={() => installSkill("opencode", "OpenCode")}>
+                  装到 OpenCode
+                </button>
+                <button className="quick" onClick={() => installSkill("codex", "Codex")}>
+                  装到 Codex
+                </button>
+              </div>
+              <button
+                className="cmd"
+                onClick={() => copy(skillPrompt, "skill-prompt")}
+                style={{ width: "100%" }}
+              >
+                <code>{skillPrompt}</code>
+                <span className="link">{copied === "skill-prompt" ? "已复制" : "复制提示词"}</span>
+              </button>
             </div>
 
             <div className="card">
@@ -584,29 +781,36 @@ export default function App() {
                 <div>
                   <h2>工具</h2>
                   <p className="sub">
-                    {state.mcp_keys ? "6 个工具 · 5 个默认开启" : "5 个工具 · 全部开启"}
+                    {state.mcp_keys ? "6 个工具 · 含按键" : "5 个工具 · 以胶囊为中心"}
                   </p>
                 </div>
               </div>
 
               <div className="tool">
                 <div>
-                  <b>读取最近转写</b>
-                  <span>拿到刚说的话，直接给 Agent 当输入</span>
+                  <b>列出胶囊</b>
+                  <span>默认只给还没消化的，按时间新到旧</span>
                 </div>
                 <span className="tog on" />
               </div>
               <div className="tool">
                 <div>
-                  <b>胶囊读写</b>
-                  <span>列出、查看，或让 Agent 新建和删除</span>
+                  <b>读取 / 标记</b>
+                  <span>看全文；用户确认后标成已整理，收件箱才会空</span>
+                </div>
+                <span className="tog on" />
+              </div>
+              <div className="tool">
+                <div>
+                  <b>新建胶囊</b>
+                  <span>用户说「记一下」时才写，不自动囤</span>
                 </div>
                 <span className="tog on" />
               </div>
               <div className="tool">
                 <div>
                   <b>打字到光标</b>
-                  <span>把 Agent 的结果打进当前应用</span>
+                  <span>把整理结果放回用户正在写的地方</span>
                 </div>
                 <span className="tog on" />
               </div>
@@ -707,17 +911,5 @@ export default function App() {
   );
 }
 
-function jsonSnippet() {
-  return `{
-  "mcpServers": {
-    "vibetype": {
-      "command": "/Applications/VibeType.app/Contents/MacOS/vibetype",
-      "args": ["--mcp"]
-    }
-  }
-}`;
-}
-
-function cliSnippet(state: UiState) {
-  return `claude mcp add vibetype -- "$HOME/Applications/VibeType.app/Contents/MacOS/vibetype" --mcp\n# 当前地址 ${state.address}:${state.port}`;
-}
+const skillPrompt =
+  "用 vibetype 的 MCP 帮我整理闪念胶囊：先列 status=new 的，按主题归纳，给我最多三个下一步；我确认后你再标成已整理。";

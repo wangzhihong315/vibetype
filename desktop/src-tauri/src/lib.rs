@@ -56,6 +56,23 @@ fn refresh_capsules(state: tauri::State<'_, state::AppState>) -> state::UiState 
 }
 
 #[tauri::command]
+fn install_skill(target: String) -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|_| "找不到 HOME".to_string())?;
+    let dir = match target.as_str() {
+        "claude" => format!("{home}/.claude/skills/vibetype-capsules"),
+        "zcode" => format!("{home}/.agents/skills/vibetype-capsules"),
+        "opencode" => format!("{home}/.config/opencode/skills/vibetype-capsules"),
+        "codex" => format!("{home}/.codex/skills/vibetype-capsules"),
+        _ => return Err("不支持的客户端".into()),
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = format!("{dir}/SKILL.md");
+    std::fs::write(&path, include_str!("../../../skills/vibetype-capsules/SKILL.md"))
+        .map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
+#[tauri::command]
 fn set_mcp_keys(state: tauri::State<'_, state::AppState>, enabled: bool) -> state::UiState {
     state.set_mcp_keys(enabled);
     state.snapshot()
@@ -170,6 +187,7 @@ pub fn run() {
             revoke_device,
             remove_capsule,
             refresh_capsules,
+            install_skill,
             set_mcp_keys,
             autostart_enabled,
             set_autostart,

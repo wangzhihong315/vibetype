@@ -10,7 +10,7 @@
 vibetype://pair?h=192.168.1.23&p=47823&c=482913
 ```
 
-- `h` 局域网 IPv4，`p` 端口，`c` 一次性配对码（120 秒轮换）。
+- `h` 局域网 IPv4，`p` 端口，`c` 一次性配对码（180 秒轮换，上一轮再保留 180 秒宽限）。
 - 手机也可以手动输入 `192.168.1.23:47823` + 六位码。
 
 配对成功后，桌面端下发长期 `deviceToken`（32 字节 hex），手机存本地；之后每次连接直接用它。
@@ -42,7 +42,7 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 手机 → 桌面：
 
 ```json
-{"t":"text","id":"9f2c...","text":"明天记得把 Readme 的英文版补上。","ms":4800,"lang":"zh","engine":"sensevoice-int8"}
+{"t":"text","id":"9f2c...","text":"明天记得把 Readme 的英文版补上。","ms":4800,"lang":"zh","engine":"x-asr"}
 ```
 
 桌面 → 手机：
@@ -55,9 +55,35 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 
 `text` 里的换行由 JSON 转义为 `\n`，不影响按行分帧。手机端等待 `ack` 最长 5 秒，超时标记为「已发送，未确认」，不重发（避免重复上屏）。
 
+## 指针与按键
+
+触控板和遥控器按键复用同一条连接，不等 ack，按顺序发：
+
+```json
+{"t":"pointer","action":"move","dx":12.5,"dy":-8.0}
+{"t":"pointer","action":"scroll","dx":0,"dy":-3.0}
+{"t":"pointer","action":"click","button":"left"}
+{"t":"pointer","action":"down","button":"left"}
+{"t":"pointer","action":"up","button":"left"}
+{"t":"key","name":"enter"}
+```
+
+`action`：`move` / `scroll` / `click` / `down` / `up`。`button`：`left` / `right` / `middle`。
+`key.name`：`enter` / `delete` / `esc` / `switch` / `custom`。
+
+## 胶囊
+
+手机保存一条胶囊后，以及在每次连接成功时补发本地 `synced=false` 的胶囊：
+
+```json
+{"t":"capsule","id":"e772847b-...","text":"把下载链接放到 README 最上面","createdAt":1794406339322,"ms":3800}
+```
+
+桌面端按 `id` 去重后落盘；已经标成 `used` 的胶囊，重发不会把状态改回 `new`。
+
 ## 保活
 
-任一方可发 `{"t":"ping","ts":<毫秒>}`，对方回 `{"t":"pong","ts":<原样返回>}`。空闲 60 秒由桌面端断开。
+任一方可发 `{"t":"ping","ts":<毫秒>}`，对方回 `{"t":"pong","ts":<原样返回>}`。空闲 180 秒由桌面端断开。
 
 ## 兼容性
 

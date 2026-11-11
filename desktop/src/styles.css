@@ -146,6 +146,14 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.sb-foot .txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sb-foot .ver {
@@ -589,10 +597,28 @@ button {
   background: var(--fill);
 }
 
+.ientry .head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .ientry .t {
   display: block;
   font-size: 10px;
   color: var(--faint);
+}
+
+.ientry .tag {
+  margin-left: auto;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.tag.wait {
+  background: rgba(255, 159, 10, 0.14);
+  color: #c77800;
 }
 
 .ientry .x {
@@ -877,4 +903,114 @@ button {
   font-size: 12px;
   width: fit-content;
   margin: 0 auto;
+}
+
+/* MCP 客户端选择 */
+.client-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.client {
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.client.on {
+  background: rgba(10, 132, 255, 0.1);
+  color: var(--blue);
+  font-weight: 500;
+}
+
+.how {
+  margin: 11px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.cmd {
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+
+.cmd code {
+  flex: 1;
+  min-width: 0;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cmd .link {
+  flex: 0 0 auto;
+}
+
+.path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+  font-size: 11px;
+}
+
+.path-row .k {
+  color: var(--faint);
+}
+
+.path-row .v {
+  flex: 1;
+  min-width: 0;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint code {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  background: var(--fill);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+
+/* 配套 Skill */
+.skill-row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.skill-row .quick {
+  flex: 1;
+  min-width: 120px;
+  height: 34px;
+  font-size: 11px;
+}
+
+button.cmd {
+  text-align: left;
+  cursor: pointer;
+}
+
+button.cmd .link {
+  flex: 0 0 auto;
 }

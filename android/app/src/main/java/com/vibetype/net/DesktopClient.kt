@@ -112,7 +112,13 @@ class DesktopClient(private val settings: PairingStore) {
      * 或桌面端两种注入都失败。失败不重发，避免同一段话上屏两次。
      */
     /** 胶囊只是抄一份到电脑，方便桌面查看和 MCP 读取；丢了也不影响手机上的原件。 */
-    fun sendCapsule(id: String, text: String, createdAt: Long, durationMs: Int) {
+    fun sendCapsule(
+        id: String,
+        text: String,
+        createdAt: Long,
+        durationMs: Int,
+        onSent: (() -> Unit)? = null,
+    ) {
         val out = writer ?: return
         if (_state.value !is ConnState.Connected) return
         val frame = JSONObject()
@@ -125,6 +131,7 @@ class DesktopClient(private val settings: PairingStore) {
         scope.launch {
             try {
                 writeLine(out, frame)
+                onSent?.invoke()
             } catch (e: Exception) {
                 Log.w(TAG, "sendCapsule failed: ${e.message}")
             }

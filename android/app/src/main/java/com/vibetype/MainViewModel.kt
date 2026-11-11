@@ -104,9 +104,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { capsuleStore.load() }
         viewModelScope.launch {
             client.state.collect { state ->
-                if (state is ConnState.NeedsPairing) {
-                    settings.token = null
-                    _paired.value = false
+                when (state) {
+                    is ConnState.NeedsPairing -> {
+                        settings.token = null
+                        _paired.value = false
+                    }
+                    is ConnState.Connected -> syncPendingCapsules()
+                    else -> Unit
                 }
             }
         }
@@ -253,9 +257,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val text = corrector.correct(raw).text
             val capsule = capsuleStore.add(text, durationMs)
-            client.sendCapsule(capsule.id, capsule.text, capsule.createdAt, capsule.durationMs)
+            client.sendCapsule(capsule.id, capsule.text, capsule.createdAt, capsule.durationMs) {
+                viewModelScope.launch { capsuleStore.markSynced(capsule.id) }
+            }
             _capsuleSaving.value = false
             _capsuleSaved.tryEmit(capsule)
+        }
+    }
+
+    /** 连上电脑后把还没抄过去的胶囊补发一遍；手机离线时记的灵感不会丢。 */
+    private fun syncPendingCapsules() {
+        val pending = capsules.value.filter { !it.synced }
+        if (pending.isEmpty()) return
+        pending.forEach { capsule ->
+            client.sendCapsule(
+                capsule.id,
+                capsule.text,
+                capsule.createdAt,
+                capsule.durationMs,
+            ) {
+                viewModelScope.launch { capsuleStore.markSynced(capsule.id) }
+            }
         }
     }
 
