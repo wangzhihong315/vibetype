@@ -2,6 +2,11 @@ package com.vibetype.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -48,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -200,6 +206,7 @@ fun RemoteScreen(
             onUp = vm::sendPointerUp,
             onRetry = vm::resendLast,
             onOpenTranscript = { showTranscript = true },
+            onZoom = vm::sendZoom,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -325,6 +332,7 @@ private fun Trackpad(
     onUp: () -> Unit,
     onRetry: () -> Unit,
     onOpenTranscript: () -> Unit,
+    onZoom: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current.density
@@ -341,7 +349,7 @@ private fun Trackpad(
                         trackpadGestures(
                             density, edgePx, slop, leftHanded,
                             pointerSpeed, naturalScroll,
-                            onMove, onScroll, onClick, onDown, onUp,
+                            onMove, onScroll, onClick, onDown, onUp, onZoom,
                         )
                     }
                 } else {
@@ -483,8 +491,10 @@ private suspend fun PointerInputScope.trackpadGestures(
     onClick: (String) -> Unit,
     onDown: () -> Unit,
     onUp: () -> Unit,
+    onZoom: (Float) -> Unit,
 ) {
     val scrollSign = if (natural) 1f else -1f
+    var zoomAccum = 0f
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val started = System.currentTimeMillis()
@@ -497,6 +507,7 @@ private suspend fun PointerInputScope.trackpadGestures(
         var total = Offset.Zero
         var maxPointers = 1
         var lastTwo: Offset? = null
+        var lastTwoDistance: Float? = null
         var twoFingerMoved = false
         var dragging = false
 
@@ -510,14 +521,33 @@ private suspend fun PointerInputScope.trackpadGestures(
 
             if (pressed.size >= 2) {
                 val previous = lastTwo
-                if (previous != null) {
-                    val dy = centroid.y - previous.y
-                    if (abs(dy) > 0.8f) {
-                        onScroll(0f, -dy / density * 0.85f * speed * scrollSign)
+                val distance = (pressed[0].position - pressed[1].position).getDistance()
+                val previousDistance = lastTwoDistance
+                if (previous != null && previousDistance != null) {
+                    val dDistance = distance - previousDistance
+                    val dCentroid = (centroid - previous).getDistance()
+                    // 两指间距变化明显大于整体位移 → 当作捏合，而不是滚动
+                    if (abs(dDistance) > 1.2f && abs(dDistance) > dCentroid * 0.8f) {
+                        zoomAccum += dDistance / density * 0.6f
+                        while (zoomAccum > 16f) {
+                            onZoom(1f)
+                            zoomAccum -= 16f
+                        }
+                        while (zoomAccum < -16f) {
+                            onZoom(-1f)
+                            zoomAccum += 16f
+                        }
                         twoFingerMoved = true
+                    } else {
+                        val dy = centroid.y - previous.y
+                        if (abs(dy) > 0.8f) {
+                            onScroll(0f, -dy / density * 0.85f * speed * scrollSign)
+                            twoFingerMoved = true
+                        }
                     }
                 }
                 lastTwo = centroid
+                lastTwoDistance = distance
             } else {
                 val delta = centroid - last
                 total += delta
@@ -1107,6 +1137,7 @@ private fun SettingsSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 18.dp),
@@ -1253,6 +1284,159 @@ private fun SettingsRow(
     }
 }
 
+@Composable
+private fun GestureDemo(selected: Int) {
+    val transition = rememberInfiniteTransition(label = "demo")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1700, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "t",
+    )
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF1D1E24))
+    ) {
+        val w = size.width
+        val h = size.height
+        val dot = 15f
+        val white = Color.White
+
+        fun finger(x: Float, y: Float, alpha: Float = 1f, radius: Float = dot) {
+            drawCircle(
+                color = white.copy(alpha = 0.16f * alpha),
+                radius = radius * 1.9f,
+                center = Offset(x, y),
+            )
+            drawCircle(color = white.copy(alpha = alpha), radius = radius, center = Offset(x, y))
+        }
+
+        val wave = kotlin.math.sin(t * Math.PI).toFloat()
+
+        when (selected) {
+            0 -> { // 单指移动
+                val x = w * (0.22f + 0.56f * t)
+                val y = h * (0.72f - 0.44f * t)
+                for (i in 1..10) {
+                    val p = (t - i * 0.018f).coerceAtLeast(0f)
+                    drawCircle(
+                        color = Color(0xFF4DA3FF).copy(alpha = 0.35f * (1f - i / 11f)),
+                        radius = 4f,
+                        center = Offset(w * (0.22f + 0.56f * p), h * (0.72f - 0.44f * p)),
+                    )
+                }
+                finger(x, y)
+            }
+            1 -> { // 轻点
+                val cx = w / 2f
+                val cy = h / 2f
+                drawCircle(
+                    color = VibeBlue.copy(alpha = 0.35f * (1f - wave)),
+                    radius = dot + 30f * wave,
+                    center = Offset(cx, cy),
+                )
+                finger(cx, cy)
+            }
+            2 -> { // 双指滑动
+                val y = h * (0.74f - 0.5f * t)
+                finger(w * 0.40f, y)
+                finger(w * 0.60f, y)
+                for (i in 1..6) {
+                    val p = (t - i * 0.03f).coerceAtLeast(0f)
+                    val yy = h * (0.74f - 0.5f * p)
+                    drawCircle(color = white.copy(alpha = 0.12f), radius = 3f, center = Offset(w * 0.40f, yy))
+                    drawCircle(color = white.copy(alpha = 0.12f), radius = 3f, center = Offset(w * 0.60f, yy))
+                }
+            }
+            3 -> { // 双指轻点
+                val cx = w / 2f
+                val cy = h / 2f
+                finger(cx - 26f, cy, radius = dot * (0.9f + 0.2f * wave))
+                finger(cx + 26f, cy, radius = dot * (0.9f + 0.2f * wave))
+                drawCircle(
+                    color = VibeBlue.copy(alpha = 0.30f * (1f - wave)),
+                    radius = dot + 34f * wave,
+                    center = Offset(cx, cy),
+                )
+            }
+            4 -> { // 双指捏合
+                val spread = w * (0.09f + 0.20f * wave)
+                finger(w / 2f - spread, h / 2f)
+                finger(w / 2f + spread, h / 2f)
+                drawLine(
+                    color = white.copy(alpha = 0.25f),
+                    start = Offset(w / 2f - spread, h / 2f),
+                    end = Offset(w / 2f + spread, h / 2f),
+                    strokeWidth = 2f,
+                )
+            }
+            5 -> { // 停住再拖
+                val hold = 0.45f
+                if (t < hold) {
+                    val cx = w * 0.32f
+                    val cy = h * 0.58f
+                    val grow = t / hold
+                    drawCircle(
+                        color = VibeCoral.copy(alpha = 0.30f * (1f - grow)),
+                        radius = dot + 34f * grow,
+                        center = Offset(cx, cy),
+                    )
+                    finger(cx, cy)
+                } else {
+                    val p = (t - hold) / (1f - hold)
+                    val x = w * (0.32f + 0.42f * p)
+                    finger(x, h * 0.58f)
+                    drawLine(
+                        color = VibeCoral.copy(alpha = 0.5f),
+                        start = Offset(w * 0.32f, h * 0.58f),
+                        end = Offset(x, h * 0.58f),
+                        strokeWidth = 3f,
+                    )
+                }
+            }
+            6 -> { // 边缘滑动
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.10f),
+                    topLeft = Offset(w - 20f, h * 0.2f),
+                    size = androidx.compose.ui.geometry.Size(6f, h * 0.6f),
+                    cornerRadius = CornerRadius(3f, 3f),
+                )
+                val y = h * (0.78f - 0.56f * t)
+                finger(w - 17f, y, radius = dot * 0.9f)
+            }
+            else -> { // 按住胶囊键
+                val cx = w / 2f
+                val cy = h / 2f
+                val pulse = 0.85f + 0.15f * wave
+                drawRoundRect(
+                    color = VibeCoral.copy(alpha = 0.9f),
+                    topLeft = Offset(cx - 26f, cy - 50f * pulse),
+                    size = androidx.compose.ui.geometry.Size(52f, 100f * pulse),
+                    cornerRadius = CornerRadius(26f, 26f),
+                )
+                val barWidth = 5f
+                var x = cx - (barWidth * 3 + 6f * 2) / 2f
+                listOf(0.45f, 0.75f, 0.55f).forEach { weight ->
+                    val half = 30f * weight * (0.8f + 0.3f * wave)
+                    drawRoundRect(
+                        color = Color.White,
+                        topLeft = Offset(x, cy - half),
+                        size = androidx.compose.ui.geometry.Size(barWidth, half * 2),
+                        cornerRadius = CornerRadius(barWidth / 2, barWidth / 2),
+                    )
+                    x += barWidth + 6f
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GestureSheet(onDismiss: () -> Unit) {
@@ -1261,10 +1445,12 @@ private fun GestureSheet(onDismiss: () -> Unit) {
         "轻点" to "左键",
         "双指滑动" to "滚动页面",
         "双指轻点" to "右键",
+        "双指捏合" to "放大 / 缩小",
         "停住再拖" to "按住左键拖拽",
         "边缘滑动" to "滚动，不碰鼠标位置",
         "按住胶囊键" to "存一条闪念",
     )
+    var selected by remember { mutableIntStateOf(0) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1275,17 +1461,33 @@ private fun GestureSheet(onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 18.dp),
         ) {
             Text("触控板手势", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
-            Spacer(Modifier.height(14.dp))
-            rows.forEach { (gesture, meaning) ->
+            Spacer(Modifier.height(12.dp))
+            key(selected) {
+                GestureDemo(selected)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "点一行看演示",
+                fontSize = 10.sp,
+                color = VibeFaint,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            rows.forEachIndexed { index, (gesture, meaning) ->
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 10.dp),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (index == selected) Color(0xFFF2F3F5) else Color.Transparent)
+                        .clickable { selected = index }
+                        .padding(vertical = 10.dp, horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -1301,7 +1503,7 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                     Text(meaning, fontSize = 13.sp, color = VibeMuted)
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             Box(
                 Modifier
                     .fillMaxWidth()

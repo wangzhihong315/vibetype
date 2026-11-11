@@ -63,12 +63,14 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 {"t":"pointer","action":"move","dx":12.5,"dy":-8.0}
 {"t":"pointer","action":"scroll","dx":0,"dy":-3.0}
 {"t":"pointer","action":"click","button":"left"}
+{"t":"pointer","action":"zoom","dx":0,"dy":1}
 {"t":"pointer","action":"down","button":"left"}
 {"t":"pointer","action":"up","button":"left"}
 {"t":"key","name":"enter"}
 ```
 
-`action`：`move` / `scroll` / `click` / `down` / `up`。`button`：`left` / `right` / `middle`。
+`action`：`move` / `scroll` / `click` / `down` / `up` / `zoom`。`button`：`left` / `right` / `middle`。
+`zoom` 的 `dy` 是步数：正数放大、负数缩小；手机端按两指间距累积，跨过阈值才发一档。
 
 ## 键位
 

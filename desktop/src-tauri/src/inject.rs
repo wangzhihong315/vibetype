@@ -135,6 +135,7 @@ pub fn pointer(action: &str, button: &str, dx: f32, dy: f32) -> bool {
         "click" => enigo
             .button(button_of(button), Direction::Click)
             .is_ok(),
+        "zoom" => zoom(dy),
         _ => false,
     })
     .unwrap_or(false)
@@ -238,6 +239,8 @@ fn mac_code(key: &str) -> Option<u16> {
         "pagedown" => 121,
         "left" => 123,
         "right" => 124,
+        "equal" => 24,
+        "minus" => 27,
         "down" => 125,
         "up" => 126,
         _ => return None,
@@ -285,6 +288,8 @@ fn enigo_key(key: &str) -> Option<Key> {
         "pagedown" => Key::PageDown,
         "left" => Key::LeftArrow,
         "right" => Key::RightArrow,
+        "equal" => Key::Unicode('='),
+        "minus" => Key::Unicode('-'),
         "up" => Key::UpArrow,
         "down" => Key::DownArrow,
         _ => return None,
@@ -398,6 +403,18 @@ pub fn open_settings() {
         let _ = std::process::Command::new("cmd")
             .args(["/C", "start", "ms-settings:easeofaccess"])
             .spawn();
+    }
+}
+
+/// 双指捏合：正向放大、负向缩小。用系统的放大/缩小快捷键，一步一档。
+pub fn zoom(steps: f32) -> bool {
+    let modifier = if cfg!(target_os = "macos") { "cmd" } else { "ctrl" }.to_string();
+    if steps > 0.0 {
+        press_combo("equal", &[modifier])
+    } else if steps < 0.0 {
+        press_combo("minus", &[modifier])
+    } else {
+        false
     }
 }
 

@@ -440,6 +440,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sendScroll(dx: Float, dy: Float) = client.sendPointer("scroll", "", dx, dy)
 
+    /** 双指捏合：正向放大、负向缩小，一步一个档。 */
+    fun sendZoom(steps: Float) = client.sendPointer("zoom", "", 0f, steps)
+
     fun sendClick(button: String) = client.sendPointer("click", button)
 
     /** 长按拖动：先按住左键，移动照旧走 move，松手再抬起。 */
