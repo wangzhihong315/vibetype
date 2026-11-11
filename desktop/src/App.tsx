@@ -677,13 +677,7 @@ export default function App() {
 
             {capsules.length === 0 ? (
               <div className="card grow center">
-                <div className="empty-capsule">
-                  <svg viewBox="0 0 24 30" width="24" height="30" aria-hidden="true">
-                    <rect x="4" y="2" width="16" height="26" rx="8" fill="#ff6b4a" />
-                    <path d="M4 17h16" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" opacity="0.9" />
-                    <path d="M12 6l1 2.4 2.4 1L13 10.4 12 12.8l-1-2.4-2.4-1L11 8.4z" fill="#fff" />
-                  </svg>
-                </div>
+                <div className="empty-capsule">＋</div>
                 <b>还没有胶囊</b>
                 <p className="empty">
                   在手机上按住胶囊键说一句话，它就会出现在这里。

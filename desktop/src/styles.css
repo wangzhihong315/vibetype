@@ -683,17 +683,15 @@ button {
 }
 
 .empty-capsule {
-  width: 64px;
-  height: 64px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(255, 107, 74, 0.1);
+  background: var(--fill);
+  color: var(--faint);
+  font-size: 20px;
   display: grid;
   place-items: center;
-  margin-bottom: 10px;
-}
-
-.empty-capsule svg {
-  display: block;
+  margin-bottom: 6px;
 }
 
 .flash {

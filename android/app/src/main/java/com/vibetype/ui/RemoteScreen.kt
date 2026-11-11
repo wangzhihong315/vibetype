@@ -260,8 +260,6 @@ fun RemoteScreen(
             naturalScroll = naturalScroll,
             edgeScrollSpeed = edgeScrollSpeed,
             debuggable = vm.debuggable,
-            capsuleCount = capsules.size,
-            capsulePending = pendingCapsules,
             onDismiss = { showSettings = false },
             onSelfTest = {
                 showSettings = false
@@ -1308,8 +1306,6 @@ private fun SettingsSheet(
     naturalScroll: Boolean,
     edgeScrollSpeed: Float,
     debuggable: Boolean,
-    capsuleCount: Int,
-    capsulePending: Int,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
     onSpeedChange: (Float) -> Unit,
@@ -1441,7 +1437,10 @@ private fun SettingsSheet(
             }
 
             Spacer(Modifier.height(16.dp))
-            CapsuleSettingsCard(count = capsuleCount, pending = capsulePending)
+            SettingsGroup("胶囊") {
+                SettingsRow(title = "保存位置", value = "这台手机")
+                SettingsRow(title = "转写", value = "手机本地")
+            }
 
             if (debuggable) {
                 Spacer(Modifier.height(16.dp))
@@ -1456,89 +1455,6 @@ private fun SettingsSheet(
     }
 }
 
-
-/**
- * 设置里的胶囊卡片：不并进普通分组，用浅珊瑚底和图形把自己区分出来。
- */
-@Composable
-private fun CapsuleSettingsCard(count: Int, pending: Int) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFFFF4F0))
-            .padding(horizontal = 16.dp),
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(Color.White),
-                contentAlignment = Alignment.Center,
-            ) {
-                CapsuleGlyph(
-                    fill = VibeCoral,
-                    cutout = Color.White,
-                    progress = 0f,
-                    recording = false,
-                    wave = 0f,
-                    modifier = Modifier.size(16.dp, 21.dp),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "闪念胶囊",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = VibeInk,
-                    )
-                    if (count > 0) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "$count",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = VibeCoral,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(VibeCoral.copy(alpha = 0.13f))
-                                .padding(horizontal = 6.dp, vertical = 1.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(2.dp))
-                Text("按住胶囊键，说一句就存下来", fontSize = 11.sp, color = VibeMuted)
-            }
-        }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(Color(0x0F000000))
-        )
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("手机本地转写 · 不上传云端", fontSize = 11.sp, color = VibeMuted)
-            Spacer(Modifier.weight(1f))
-            when {
-                pending > 0 -> Text("$pending 条待同步", fontSize = 11.sp, color = VibeCoral)
-                count > 0 -> Text("已同步", fontSize = 11.sp, color = Color(0xFF1F9D43))
-            }
-        }
-    }
-}
 
 @Composable
 private fun SettingsGroup(label: String, content: @Composable ColumnScope.() -> Unit) {
@@ -2032,27 +1948,10 @@ private fun CapsuleList(
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CapsuleGlyph(
-                fill = VibeCoral,
-                cutout = Color.White,
-                progress = 0f,
-                recording = false,
-                wave = 0f,
-                modifier = Modifier.size(18.dp, 23.dp),
-            )
-            Spacer(Modifier.width(8.dp))
             Text("闪念胶囊", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
             if (items.isNotEmpty()) {
                 Spacer(Modifier.width(7.dp))
-                Text(
-                    "${items.size}",
-                    fontSize = 11.sp,
-                    color = VibeCoral,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(VibeCoral.copy(alpha = 0.12f))
-                        .padding(horizontal = 7.dp, vertical = 2.dp),
-                )
+                Text("${items.size}", fontSize = 13.sp, color = VibeFaint)
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) {
@@ -2069,25 +1968,18 @@ private fun CapsuleList(
             ) {
                 Box(
                     Modifier
-                        .size(64.dp)
+                        .size(54.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFFF0EB)),
+                        .background(Color(0xFFF2F3F5)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CapsuleGlyph(
-                        fill = VibeCoral,
-                        cutout = Color(0xFFFFF0EB),
-                        progress = 0f,
-                        recording = false,
-                        wave = 0f,
-                        modifier = Modifier.size(21.dp, 27.dp),
-                    )
+                    Text("＋", fontSize = 24.sp, color = VibeFaint)
                 }
-                Spacer(Modifier.height(16.dp))
-                Text("还没有胶囊", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VibeInk)
+                Spacer(Modifier.height(14.dp))
+                Text("还没有胶囊", fontSize = 15.sp, color = VibeInk)
                 Spacer(Modifier.height(7.dp))
                 Text(
-                    "按住胶囊键，说一句就存下来。\n灵感先收着，整理以后再说。",
+                    "按住遥控器上的胶囊键，把刚才想到的那句话留下来。",
                     fontSize = 12.sp,
                     lineHeight = 19.sp,
                     color = VibeMuted,
@@ -2123,16 +2015,6 @@ private fun CapsuleList(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
                                     .background(Color(0x1F30D158))
-                                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                            )
-                        } else {
-                            Text(
-                                "待同步",
-                                fontSize = 10.sp,
-                                color = VibeCoral,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(VibeCoral.copy(alpha = 0.12f))
                                     .padding(horizontal = 7.dp, vertical = 2.dp),
                             )
                         }
