@@ -408,11 +408,19 @@ pub fn open_settings() {
 
 /// 双指捏合：正向放大、负向缩小。用系统的放大/缩小快捷键，一步一档。
 pub fn zoom(steps: f32) -> bool {
-    let modifier = if cfg!(target_os = "macos") { "cmd" } else { "ctrl" }.to_string();
-    if steps > 0.0 {
-        press_combo("equal", &[modifier])
+    if cfg!(target_os = "macos") {
+        // macOS 的放大是 ⌘+，也就是 ⌘⇧=；只发 ⌘= 只有浏览器认，Preview 不认。
+        if steps > 0.0 {
+            press_combo("equal", &["cmd".into(), "shift".into()])
+        } else if steps < 0.0 {
+            press_combo("minus", &["cmd".into()])
+        } else {
+            false
+        }
+    } else if steps > 0.0 {
+        press_combo("equal", &["ctrl".into()])
     } else if steps < 0.0 {
-        press_combo("minus", &[modifier])
+        press_combo("minus", &["ctrl".into()])
     } else {
         false
     }
