@@ -59,9 +59,16 @@ fn open_permission_settings() {
 
 pub fn run() {
     tauri::Builder::default()
+        // 单实例必须最先注册：第二次启动只把已有窗口叫出来
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            None,
+            Some(vec!["--minimized"]),
         ))
         .setup(|app| {
             let handle = app.handle().clone();
@@ -99,6 +106,17 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // 开机自启时不弹窗口，只在托盘里待着
+            let minimized = std::env::args().any(|arg| arg == "--minimized");
+            if !minimized {
+                if let Some(window) = app.get_webview_window("main") {
+                    // 显示器重排后窗口可能落在屏幕外，每次启动居中到主屏
+                    let _ = window.center();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
 
             Ok(())
         })
