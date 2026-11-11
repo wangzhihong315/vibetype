@@ -197,6 +197,7 @@ fun RemoteScreen(
             onClick = vm::sendClick,
             onDown = vm::sendPointerDown,
             onUp = vm::sendPointerUp,
+            onRetry = vm::resendLast,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -309,6 +310,7 @@ private fun Trackpad(
     onClick: (String) -> Unit,
     onDown: () -> Unit,
     onUp: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current.density
@@ -362,7 +364,7 @@ private fun Trackpad(
             )
             capsuleSaving -> BusyOverlay(label = "存进胶囊…")
             busy -> BusyOverlay(label = "转写中…")
-            last != null -> ResultToast(last)
+            last != null -> ResultToast(last, onRetry = onRetry)
         }
 
         if (connected && !recording && !capsuleRecording && !busy && last == null) {
@@ -701,11 +703,18 @@ private fun BusyOverlay(label: String) {
 }
 
 @Composable
-private fun ResultToast(transcript: Transcript) {
+private fun ResultToast(transcript: Transcript, onRetry: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(10.dp)
+            .then(
+                if (transcript.ack == AckState.Failed) {
+                    Modifier.clickable(onClick = onRetry)
+                } else {
+                    Modifier
+                }
+            )
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White)
             .padding(horizontal = 13.dp, vertical = 11.dp),
@@ -738,14 +747,19 @@ private fun ResultToast(transcript: Transcript) {
             )
         }
         Spacer(Modifier.width(9.dp))
-        Text(
-            text = transcript.text,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
-            color = VibeInk,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = transcript.text,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = VibeInk,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (transcript.ack == AckState.Failed) {
+                Text("点一下重发", fontSize = 10.sp, color = VibeCoral)
+            }
+        }
     }
 }
 

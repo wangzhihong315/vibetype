@@ -465,6 +465,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _naturalScroll.value = value
     }
 
+    /** 上屏失败时点结果卡重发，不用再说一遍。 */
+    fun resendLast() {
+        val transcript = _last.value ?: return
+        if (transcript.ack == AckState.Pending) return
+        viewModelScope.launch {
+            _last.value = transcript.copy(ack = AckState.Pending)
+            val ok = client.sendText(transcript.text, 0, "zh")
+            _last.value = _last.value?.copy(
+                ack = if (ok) AckState.Delivered else AckState.Failed
+            )
+            if (!ok) _notice.value = "还是没发出去"
+        }
+    }
+
     /** 结果卡看一会儿就收起来，失败时留着。 */
     fun clearLast() {
         if (_last.value?.ack != AckState.Failed) {
