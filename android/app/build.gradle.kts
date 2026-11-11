@@ -63,16 +63,21 @@ android {
 }
 
 // 模型不进 git（GitHub 单文件限制 100 MB），构建前确认 assets 已就位
-val checkSenseVoiceModel = tasks.register("checkSenseVoiceModel") {
+val checkAsrModel = tasks.register("checkAsrModel") {
     doLast {
-        val dir = file("src/main/assets/models/sensevoice")
-        if (!dir.resolve("model.int8.onnx").isFile || !dir.resolve("tokens.txt").isFile) {
-            throw GradleException("缺少 SenseVoice 模型：先在仓库根目录运行 tools/fetch_model.sh")
+        val dir = file("src/main/assets/models/x-asr")
+        val required = listOf(
+            "encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx",
+            "tokens.txt", "bpe.vocab", "hotwords.txt",
+        )
+        val missing = required.filter { !dir.resolve(it).isFile }
+        if (missing.isNotEmpty()) {
+            throw GradleException("缺少 X-ASR 模型文件 $missing：先在仓库根目录运行 tools/fetch_model.sh")
         }
     }
 }
 
-tasks.named("preBuild").configure { dependsOn(checkSenseVoiceModel) }
+tasks.named("preBuild").configure { dependsOn(checkAsrModel) }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.06.01"))

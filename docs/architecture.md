@@ -13,7 +13,7 @@
 静音裁剪（首尾能量门限）
    │
    ▼
-SenseVoiceSmall int8（sherpa-onnx，非自回归，一次前向）
+X-ASR 960ms 流式（zh-en + 标点 + 热词，边录边出字）
    │  文本 + 语种 + 情感/事件（可选）
    ▼
 TCP 长连接（NDJSON）   ── 几十字节 ──▶  桌面端
@@ -27,14 +27,14 @@ TCP 长连接（NDJSON）   ── 几十字节 ──▶  桌面端
 | 项 | 选择 | 说明 |
 |---|---|---|
 | 语言/UI | Kotlin + Compose | 沿用 VibePad 的视觉语言 |
-| 录音 | `AudioRecord` 16 kHz / 16 bit / 单声道 | SenseVoice 固定输入 |
-| 端点 | 按住说话，松开结束；首尾按能量裁剪 | 不用 VAD 模型，v0.1 保持简单 |
-| 识别 | sherpa-onnx `OfflineRecognizer` + SenseVoice int8 | CPU，arm64-v8a |
-| 模型分发 | 随 APK 打包进 `assets/models/sensevoice/`（228 MB，APK 约 284 MB） | 无需首次下载；换模型要重新发版 |
+| 录音 | `AudioRecord` 16 kHz / 16 bit / 单声道 | X-ASR 固定输入 |
+| 端点 | 按住说话，松开结束；收尾补 1.2 s 静音 | 流式模型需要尾部静音把最后一段冲出来 |
+| 识别 | sherpa-onnx `OnlineRecognizer` + X-ASR 960ms int8 | 流式，热词，CPU arm64-v8a |
+| 模型分发 | 随 APK 打包进 `assets/models/x-asr/`（162 MB，APK 约 217 MB） | 无需首次下载；换模型要重新发版 |
 | 网络 | 前台 TCP 客户端，NDJSON | 断线指数退避重连 |
 | 配对 | 扫二维码（host/port/token）或手输六位码 | token 存 SharedPreferences |
 
-模型体积（int8）：`model.int8.onnx` 约 230 MB，`tokens.txt` 约 300 KB。首次下载需在 Wi-Fi 下进行，界面显示进度和校验（sha256）。
+模型体积：encoder 148 MB + decoder 11 MB + joiner 2.5 MB + tokens/bpe，共约 162 MB，随 APK 打包。
 
 识别耗时的目标：红米 K80（骁龙 8 Gen 3）上 5 秒语音 ≤ 1 秒，即 RTF ≤ 0.2。达不到就退到更小的模型（Paraformer-small / 流式 Zipformer），但先以实测为准。
 
@@ -67,14 +67,17 @@ src-tauri/src/
 
 ### 已知短板（2026-11-11 实测）
 
-- **中英混排里的英文术语容易错**：测试录音里的「JSON」被识别成「J song」，
-  强制 `language=zh` 后变成「J some」，两种设置都没解决。这不是语言判定问题，
-  是声学/词表问题。下一步可以：换 2025-09-09 的 int8 模型对比；在手机端加一张
-  常用术语替换表（JSON / README / API 等）；或在桌面端做一次轻量后处理。
-- **速度**：4.8 秒录音在 arm64 模拟器上转写 410 ms（RTF ≈ 0.09），真机（红米 K80）
-  还没测。模拟器与真机 CPU 调度差异较大，这个数字只能当量级参考。
-- **安装包体积**：模型（228 MB）随 APK 打包，debug APK 约 284 MB。GitHub 单文件
+- **英文专名和品牌词**：X-ASR 在热词加持下能写对 `Swift`、`JSON`，但 `README`、
+  `VibeDeck`、`VibeType` 这类专名仍会错。已加两层：模型热词 + 手机端术语纠正
+  （别名、英文近似词、上下文），实测失败用例 23.5% → 0.7%。
+- **TTS 评测的局限**：TTS 会把 `CI` 念成罗马数字「一百零一」、把 `VibeType` 读成
+  「five type」，所以英文术语的绝对 CER 不可信；真人录音才是金标准。评测集在
+  `tools/asr-eval/`。
+- **速度**：流式解码在录音过程中完成，松手后只需补 1.2 秒静音收尾；模拟器上收尾
+  约 100–120 ms。真机（K80）待测。
+- **安装包体积**：模型（162 MB）随 APK 打包，debug APK 约 217 MB。GitHub 单文件
   限制 100 MB，所以模型不进仓库，构建前用 `tools/fetch_model.sh` 拉取；CI 也走这一步。
+- **粤语/日/韩**：X-ASR 只支持中英。需要时切到 SenseVoice（可选引擎，228 MB，不随包）。
 
 ## 安全模型
 
@@ -84,11 +87,12 @@ src-tauri/src/
 
 虚拟麦克风方案把电脑当成识别端，就必须解决：音频传输、虚拟声卡驱动、输入法唤起、输入法状态。四个环节任一失败都表现为「没反应」。文字注入只依赖操作系统最稳定的一个接口——键盘事件。
 
-代价是：识别质量取决于手机端模型。这是选择 SenseVoice 的原因（中英日韩粤、非自回归、int8 可跑）。
+代价是：识别质量取决于手机端模型。默认选 X-ASR（Apache-2.0、流式、zh-en、术语最好）；粤语/日/韩切到可选的 SenseVoice。
 
 ## 许可
 
 - 本项目代码：MIT。
-- SenseVoiceSmall 权重：FunASR Model License v1.1。允许商用，要求在衍生物中保留版权声明与许可文本，且不得使用「FunASR」「SenseVoice」作为自身产品名背书。
+- 默认模型 X-ASR：Apache-2.0。
+- 可选 SenseVoiceSmall 权重：FunASR Model License v1.1。允许商用，要求在衍生物中保留版权声明与许可文本，且不得使用「FunASR」「SenseVoice」作为自身产品名背书。
 - sherpa-onnx：Apache-2.0。
 - 第三方转换的 int8 权重需在发布前单独核对来源与许可。

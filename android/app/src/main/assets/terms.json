@@ -1,0 +1,27 @@
+{
+  "aliases": [
+    ["five type", "VibeType"],
+    ["five deck", "VibeDeck"],
+    ["faryat", "README"],
+    ["闪电胶囊", "闪念胶囊"],
+    ["触控版", "触控板"],
+    ["最后依据", "最后一句"],
+    ["三除", "删除"],
+    ["菜饭时间", "开饭时间"]
+  ],
+  "context": [
+    ["跑一遍词", "跑一遍 CI"],
+    ["跑一遍一零一", "跑一遍 CI"],
+    ["跑一遍一百零一", "跑一遍 CI"]
+  ],
+  "latin": {
+    "bran": "branch",
+    "forth": "force",
+    "json": "JSON",
+    "swift": "Swift",
+    "swist": "Swift",
+    "readme": "README",
+    "vibetype": "VibeType",
+    "vibedeck": "VibeDeck"
+  }
+}

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>VibeType · 桌面端</title>
+<link rel="stylesheet" href="board.css" />
+</head>
+<body>
+
+<div class="board-head">
+  <h1>VibeType · 桌面端</h1>
+  <p>侧边栏控制台：概览、连接、设备、胶囊、MCP、设置，加上首次设置与托盘提示，共 8 个界面。</p>
+  <div class="meta">Tauri · 980 × 700 · 2026-11-11</div>
+</div>
+
+<div class="board desktops">
+
+  <!-- D1 首次设置 -->
+  <figure>
+    <div class="appwin" data-nav="none">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="onboard-window">
+        <div class="onboard-box">
+          <div class="brand-row">
+            <span class="wmark"><i></i><i></i><i></i><i></i><i></i></span>
+            <div><div style="font-size:16px;font-weight:600;">VibeType</div><div style="font-size:11px;color:#8e8e93;">手机说话，电脑上屏</div></div>
+          </div>
+          <h1>两步开始用</h1>
+          <p class="lead">电脑只负责收文字和上屏，识别全部在手机上完成。</p>
+
+          <div class="warn-strip" style="margin-top:16px;">
+            <b>还没有辅助功能权限，文字打不进任何应用。</b>
+          </div>
+
+          <div class="step-row">
+            <span class="step-badge">1</span>
+            <div class="step-body"><b>允许辅助功能</b><span>在系统设置里勾选 VibeType</span></div>
+            <span class="mini-btn">去授权</span>
+          </div>
+          <div class="step-row">
+            <span class="step-badge">2</span>
+            <div class="step-body"><b>用手机连上这台电脑</b><span>扫码，或手动输入下面的地址与配对码</span></div>
+          </div>
+
+          <div class="hero" style="margin-top:16px; padding:18px;">
+            <div class="pair">
+              <span class="label">配对码</span>
+              <div class="code" style="font-size:38px;">482 913</div>
+              <div class="address">10.10.21.188<span class="port">:47823</span></div>
+            </div>
+            <div class="qr" style="width:132px;height:132px;"><canvas class="qr" width="336" height="336"></canvas></div>
+          </div>
+
+          <div class="btn" style="margin-top:16px;">重新检查权限</div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D1 · 首次设置</b><br>没有侧边栏，权限和配对一次走完</figcaption>
+  </figure>
+
+  <!-- D2 概览 -->
+  <figure>
+    <div class="appwin" data-nav="overview">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head"><h1>概览</h1><p>手机连上就能用</p></div>
+
+          <div class="status-grid">
+            <div class="status-card"><div class="k">手机</div><div class="v"><span class="dot"></span>Redmi K80</div><div class="s">已连接 · 刚刚</div></div>
+            <div class="status-card"><div class="k">上屏权限</div><div class="v"><span class="dot"></span>辅助功能</div><div class="s">已授权</div></div>
+            <div class="status-card"><div class="k">MCP</div><div class="v"><span class="dot" style="background:#0a84ff"></span>运行中</div><div class="s">4 个工具 · stdio</div></div>
+          </div>
+
+          <div class="pcard" style="margin-top:14px; flex:1; display:flex; flex-direction:column; min-height:0;">
+            <div class="wcard-head"><h2>最近上屏</h2><span class="copy">清空</span></div>
+            <ul class="wlist">
+              <li>
+                <div class="text">帮我用 Swift 写一个解析 JSON 的函数，要带错误处理。</div>
+                <div class="meta"><span>21:04</span><span>·</span><span>直接打字</span><span class="ok">已上屏</span></div>
+              </li>
+              <li>
+                <div class="text">明天记得把 README 的英文版补上，还有把下载链接放到最上面。</div>
+                <div class="meta"><span>20:57</span><span>·</span><span>直接打字</span><span class="ok">已上屏</span></div>
+              </li>
+              <li>
+                <div class="text">这条没有上屏：焦点在密码框里。</div>
+                <div class="meta"><span>20:51</span><span>·</span><span>粘贴</span><span class="fail">未上屏</span></div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="quick-row">
+            <div class="quick primary">显示配对码</div>
+            <div class="quick">暂停接收</div>
+            <div class="quick">打开胶囊</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D2 · 概览</b><br>只回答三件事：手机、权限、MCP</figcaption>
+  </figure>
+
+  <!-- D3 连接 -->
+  <figure>
+    <div class="appwin" data-nav="connect">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head"><h1>连接手机</h1><p>扫码，或手动输入六位码</p></div>
+
+          <div class="hero" style="margin-top:14px;">
+            <div class="pair">
+              <span class="label">配对码</span>
+              <div class="code">482913</div>
+              <div class="address">10.10.21.188<span class="port">:47823</span></div>
+              <p class="hint">新设备用这个码，已配对的手机会自动重连</p>
+            </div>
+            <div class="qr"><canvas class="qr" width="336" height="336"></canvas></div>
+          </div>
+
+          <div class="pcard" style="margin-top:14px;">
+            <div class="mcp-row">
+              <span class="step-badge">1</span>
+              <div><div class="nm">手机和电脑连同一个 Wi-Fi</div><div class="sub">跨网段时手输 IP，mDNS 不跨路由</div></div>
+            </div>
+            <div class="mcp-row">
+              <span class="step-badge">2</span>
+              <div><div class="nm">在手机上输入地址和六位码</div><div class="sub">配对成功后换发长期 token，不再需要这个码</div></div>
+            </div>
+            <div class="mcp-row">
+              <span class="step-badge">3</span>
+              <div><div class="nm">之后自动重连</div><div class="sub">手机换了 Wi-Fi 或电脑重启，都会自己接回来</div></div>
+            </div>
+          </div>
+
+          <div class="quick-row">
+            <div class="quick">换一个配对码</div>
+            <div class="quick">复制地址</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D3 · 连接</b><br>一次性动作，从首页挪到独立页</figcaption>
+  </figure>
+
+  <!-- D4 设备 -->
+  <figure>
+    <div class="appwin" data-nav="devices">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head"><h1>设备</h1><p>已配对的手机</p></div>
+
+          <div class="pcard" style="margin-top:14px;">
+            <div class="device">
+              <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="1.6"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 19h3"/></svg></span>
+              <div><div class="nm">Redmi K80</div><div class="sub">Android · 刚刚在线 · 语音 + 触控板</div></div>
+              <span class="rm">移除</span>
+            </div>
+            <div class="device">
+              <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="1.6"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 19h3"/></svg></span>
+              <div><div class="nm">Redmi Note 12</div><div class="sub">Android · 3 天前 · 仅语音</div></div>
+              <span class="rm">移除</span>
+            </div>
+          </div>
+
+          <p class="hint" style="margin-top:12px;">移除后，那台手机需要重新输入配对码。</p>
+          <div class="danger-btn">移除全部设备</div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D4 · 设备</b><br>单个移除 + 一键清空</figcaption>
+  </figure>
+
+  <!-- D5 胶囊 -->
+  <figure>
+    <div class="appwin" data-nav="capsules">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head"><h1>胶囊</h1><p>手机攒下来的灵感，3 条</p></div>
+
+          <div class="inbox" style="margin-top:14px;">
+            <div class="inbox-list">
+              <div class="ientry on"><div class="t">今天 21:04</div><div class="x">把下载链接放到 README 最上面，顺便补一个英文版。</div></div>
+              <div class="ientry"><div class="t">今天 18:22</div><div class="x">胶囊要和语音输入分开入口，按住说话是即时的，胶囊是攒下来的。</div></div>
+              <div class="ientry"><div class="t">昨天 09:15</div><div class="x">问一下 K80 上 SenseVoice 的 RTF，还有 JSON 这种词能不能纠正。</div></div>
+            </div>
+            <div class="inbox-detail">
+              <div class="t">今天 21:04 · 0:06 · 已转写</div>
+              <div class="x">把下载链接放到 README 最上面，顺便补一个英文版。</div>
+              <div class="actions">
+                <span class="pill-btn">复制</span>
+                <span class="pill-btn primary">打到光标</span>
+                <span class="pill-btn" style="color:#ff6b4a;background:rgba(255,107,74,.09);">删除</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D5 · 胶囊</b><br>左列表右详情，选中就能打回光标</figcaption>
+  </figure>
+
+  <!-- D6 MCP -->
+  <figure>
+    <div class="appwin" data-nav="mcp">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head" style="display:flex;align-items:flex-start;">
+            <div><h1>MCP</h1><p>让 AI 客户端读你的转写和胶囊</p></div>
+            <span class="wpill" style="margin-left:auto;"><i class="dot"></i><span>运行中 · stdio</span></span>
+          </div>
+
+          <div class="pcard" style="margin-top:14px;">
+            <div style="display:flex;align-items:center;">
+              <div><div style="font-size:13px;font-weight:600;">接入客户端</div><div style="font-size:11px;color:#8e8e93;margin-top:2px;">复制下面的配置到客户端的 MCP 设置里</div></div>
+              <span class="copy">复制配置</span>
+            </div>
+            <div class="wseg" style="margin-top:10px;display:inline-flex;">
+              <span class="on">Claude Code</span><span>ZCode</span><span>Cursor</span>
+            </div>
+            <div class="codeblock">{
+  "mcpServers": {
+    "vibetype": {
+      "command": "/Applications/VibeType.app/Contents/MacOS/vibetype",
+      "args": ["--mcp"]
+    }
+  }
+}</div>
+          </div>
+
+          <div class="pcard mcp-tools">
+            <div style="display:flex;align-items:center;"><div style="font-size:13px;font-weight:600;">工具</div><span class="copy">4 个工具 · 3 个启用</span></div>
+            <div class="mcp-row">
+              <div><div class="nm">读取最近转写</div><div class="sub">拿到刚说的话，直接给 Agent 当输入</div></div>
+              <span class="wtoggle on"><i></i></span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">胶囊读写</div><div class="sub">列出、查看，或让 Agent 新建和删除</div></div>
+              <span class="wtoggle on"><i></i></span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">打字到光标</div><div class="sub">把 Agent 的结果打进当前应用</div></div>
+              <span class="wtoggle on"><i></i></span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm" style="color:#ff6b4a;">按键控制</div><div class="sub">回车 / 删除 / Esc，默认关闭</div></div>
+              <span class="wtoggle"><i></i></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D6 · MCP</b><br>一行配置接入，工具按需开关</figcaption>
+  </figure>
+
+  <!-- D7 设置 -->
+  <figure>
+    <div class="appwin" data-nav="settings">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">VibeType</span></div>
+      <div class="appbody">
+        <div class="main">
+          <div class="page-head"><h1>设置</h1><p>上屏方式、启动项与权限</p></div>
+
+          <div class="pcard" style="margin-top:14px;">
+            <div style="padding:2px 0 12px;">
+              <div class="label">上屏方式</div>
+              <div class="wseg" style="margin-top:9px;display:inline-flex;">
+                <span class="on">直接打字</span><span>粘贴</span>
+              </div>
+              <p class="hint" style="margin-top:9px;">直接打字更干净；个别应用不吃合成按键时，粘贴会自动兜底。</p>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">开机自启</div><div class="sub">登录后只在托盘里待着，不弹窗口</div></div>
+              <span class="wtoggle on"><i></i></span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">接收触控板</div><div class="sub">手机触控板的移动、点击与滚动</div></div>
+              <span class="wtoggle on"><i></i></span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">辅助功能</div><div class="sub">允许 VibeType 把文字打进别的应用</div></div>
+              <span class="mini-btn done" style="margin-left:auto;">已授权</span>
+            </div>
+            <div class="mcp-row">
+              <div><div class="nm">版本</div><div class="sub">VibeType 0.1.0 · 已是最新</div></div>
+              <span class="copy">检查更新</span>
+            </div>
+          </div>
+
+          <p class="hint" style="margin-top:14px;">Windows 上不需要辅助功能；目标程序以管理员身份运行时，VibeType 也要以管理员身份启动。</p>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D7 · 设置</b><br>只放会影响上屏和接收的选项</figcaption>
+  </figure>
+
+  <!-- D8 托盘 + HUD -->
+  <figure>
+    <div class="appwin" data-nav="none">
+      <div class="apptitle"><span class="lights"><i></i><i></i><i></i></span><span class="title">菜单栏常驻</span></div>
+      <div class="tray-scene">
+        <div class="tray-menu">
+          <div class="tray-item on">打开 VibeType</div>
+          <div class="tray-item">暂停接收</div>
+          <div class="tray-sep"></div>
+          <div class="tray-item">Redmi K80 已连接</div>
+          <div class="tray-item">MCP 运行中</div>
+          <div class="tray-item">开机自启 · 开</div>
+          <div class="tray-sep"></div>
+          <div class="tray-item">退出</div>
+        </div>
+
+        <div class="hud">
+          <span class="ic bad"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff6b4a" stroke-width="1.7" stroke-linecap="round"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17.2v.2"/></svg></span>
+          <div><b>这段没有上屏</b><span>辅助功能权限被系统收回了，去设置里重新打开。</span></div>
+          <span class="go">去授权</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>D8 · 托盘与失败提示</b><br>失败说清楚原因，并给一键恢复</figcaption>
+  </figure>
+
+</div>
+
+<script>
+  const NAV = [
+    { id: "overview", label: "概览", icon: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
+    { id: "connect", label: "连接", icon: '<path d="M9.5 14.5 14.5 9.5"/><path d="M8 12l-2.5 2.5a3.5 3.5 0 0 0 5 5L13 17"/><path d="M16 12l2.5-2.5a3.5 3.5 0 0 0-5-5L11 7"/>' },
+    { id: "devices", label: "设备", icon: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 19h3"/>' },
+    { id: "capsules", label: "胶囊", icon: '<rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M12 7.5v2.5"/>' },
+    { id: "mcp", label: "MCP", icon: '<path d="M8 8 4 12l4 4M16 8l4 4-4 4M14 5l-4 14"/>' },
+    { id: "settings", label: "设置", icon: '<path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2"/><circle cx="8.5" cy="17" r="2"/>' },
+  ];
+
+  function sidebar(active) {
+    return `<div class="sidebar">
+      <div class="sb-brand">
+        <span class="wmark"><i></i><i></i><i></i><i></i><i></i></span>
+        <b>VibeType</b>
+      </div>
+      <div class="sb-nav">
+        ${NAV.map(
+          (item) =>
+            `<div class="sb-item ${item.id === active ? "on" : ""}"><svg viewBox="0 0 24 24">${item.icon}</svg>${item.label}</div>`
+        ).join("")}
+      </div>
+      <div class="sb-foot">
+        <div class="row"><span class="dot"></span>Redmi K80 已连接</div>
+        <div class="row"><span class="dot" style="background:#30d158;"></span>辅助功能已授权</div>
+        <div style="margin-top:4px;color:#a0a0a5;">v0.1.0</div>
+      </div>
+    </div>`;
+  }
+
+  document.querySelectorAll(".appwin").forEach((win) => {
+    const active = win.dataset.nav;
+    if (!active || active === "none") return;
+    const body = win.querySelector(".appbody");
+    body?.insertAdjacentHTML("afterbegin", sidebar(active));
+  });
+
+  document.querySelectorAll("canvas.qr").forEach((canvas) => {
+    const ctx = canvas.getContext("2d");
+    const size = canvas.width;
+    const n = 25;
+    const s = size / n;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = "#141416";
+    let seed = 20261111;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const inFinder = (x, y) =>
+      (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
+    const finder = (ox, oy) => {
+      ctx.fillRect(ox * s, oy * s, 7 * s, 7 * s);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect((ox + 1) * s, (oy + 1) * s, 5 * s, 5 * s);
+      ctx.fillStyle = "#141416";
+      ctx.fillRect((ox + 2) * s, (oy + 2) * s, 3 * s, 3 * s);
+    };
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (inFinder(x, y)) continue;
+        if (rnd() > 0.52) ctx.fillRect(x * s, y * s, s, s);
+      }
+    }
+    finder(0, 0);
+    finder(n - 7, 0);
+    finder(0, n - 7);
+  });
+</script>
+</body>
+</html>

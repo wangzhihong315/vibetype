@@ -5,7 +5,7 @@
 语音在手机本地转写成文字，只把几十字节的结果发到电脑；Mac 与 Windows 端不做识别、不装虚拟声卡、不依赖输入法，收到文字后直接打进当前焦点。
 
 ```
-Android（SenseVoice，本地转写）
+Android（X-ASR 流式，本地转写）
         │  文字，局域网 TCP
         ├── macOS
         └── Windows
@@ -44,13 +44,13 @@ vibetype/
 v0.1 正在开发：按住说话 → 本地转写 → 电脑上屏。
 
 - [x] 项目骨架与协议
-- [x] Android：录音、SenseVoice、配对、发送
+- [x] Android：录音、X-ASR 流式转写 + 热词 + 术语纠正、配对、发送
 - [x] macOS / Windows：配对、接收、注入
 - [x] 端到端实测：手机本地转写 → 文字打进 Mac 的 TextEdit
 - [x] 模拟器实测：4.8 秒录音转写 410–650 ms（RTF ≈ 0.09–0.13）
 - [x] macOS 安装包（本地与 CI）
 - [x] Windows 安装包（CI：NSIS + MSI）
-- [x] 模型随 APK 打包（APK 约 284 MB，安装后无需下载）
+- [x] 模型随 APK 打包（X-ASR 162 MB，APK 约 217 MB，安装后无需下载）
 - [ ] 真机（K80）RTF 与识别质量
 - [ ] 英文术语识别（JSON 被听成 “J song”）
 - [ ] 胶囊（v0.2）、触控板（v0.3）
@@ -67,13 +67,13 @@ ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
 ./gradlew assembleRelease
 ```
 
-模型随 APK 打包，构建前先拉一次（228 MB，缓存在 `.cache/`，不进 git）：
+模型随 APK 打包，构建前先拉一次（约 134 MB 压缩包，缓存在 `.cache/`，不进 git）：
 
 ```bash
 tools/fetch_model.sh
 ```
 
-产物 `app/build/outputs/apk/release/app-release.apk` 约 **284 MB**。签名用仓库里的
+产物 `app/build/outputs/apk/release/app-release.apk` 约 **217 MB**。签名用仓库里的
 `android/app/vibetype-release.jks`（密码 `vibetype2026`）——本地和 CI 同一个 key，
 `adb install -r` 才能覆盖升级。这是侧载用的密钥，不是 Google Play 的发布密钥。
 
@@ -104,4 +104,4 @@ python3 tools/fake_phone.py 127.0.0.1 47823 <配对码> "测试文字"
 
 ## 许可
 
-代码 MIT。SenseVoice 模型权重遵循 FunASR Model License v1.1（允许商用，需保留署名），详见 [docs/architecture.md](docs/architecture.md)。
+代码 MIT。默认模型 X-ASR 为 Apache-2.0；可选的 SenseVoice 权重遵循 FunASR Model License v1.1（允许商用，需保留署名）。详见 [docs/architecture.md](docs/architecture.md)。

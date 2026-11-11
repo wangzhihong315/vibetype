@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibetype.AckState
@@ -68,6 +69,7 @@ fun App(
     val recording by vm.recording.collectAsState()
     val busy by vm.busy.collectAsState()
     val level by vm.level.collectAsState()
+    val partial by vm.partial.collectAsState()
     val last by vm.last.collectAsState()
     val notice by vm.notice.collectAsState()
 
@@ -91,6 +93,7 @@ fun App(
                     recording = recording,
                     busy = busy,
                     level = level,
+                    partial = partial,
                     last = last,
                     notice = notice,
                     debuggable = vm.debuggable,
@@ -123,6 +126,7 @@ private fun HomeScreen(
     recording: Boolean,
     busy: Boolean,
     level: Float,
+    partial: String,
     last: Transcript?,
     notice: String?,
     debuggable: Boolean,
@@ -200,6 +204,22 @@ private fun HomeScreen(
             )
         }
 
+        if (partial.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = partial,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                color = VibeInk,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+            )
+        }
+
         Spacer(Modifier.weight(0.7f))
 
         if (last != null) {
@@ -211,7 +231,7 @@ private fun HomeScreen(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("SenseVoice · 手机本地转写", fontSize = 12.sp, color = VibeFaint)
+            Text("X-ASR · 手机本地转写", fontSize = 12.sp, color = VibeFaint)
             Spacer(Modifier.weight(1f))
             if (debuggable) {
                 TextButton(onClick = onSelfTest) {
@@ -374,9 +394,13 @@ private fun TranscriptCard(transcript: Transcript, elapsed: String) {
         )
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("SenseVoice", fontSize = 11.sp, color = VibeFaint)
+            Text("X-ASR", fontSize = 11.sp, color = VibeFaint)
             Spacer(Modifier.width(10.dp))
             Text(elapsed, fontSize = 11.sp, color = VibeFaint)
+            if (transcript.corrected > 0) {
+                Spacer(Modifier.width(8.dp))
+                Text("已更正 ${transcript.corrected} 处", fontSize = 10.sp, color = VibeBlue)
+            }
             Spacer(Modifier.weight(1f))
             val (label, color) = when (transcript.ack) {
                 AckState.Pending -> "发送中" to VibeMuted

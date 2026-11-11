@@ -24,6 +24,10 @@ class Recorder(private val sampleRate: Int = SAMPLE_RATE) {
     @Volatile
     private var recording = false
 
+    /** 每读到一块 PCM 就回调一次，用于流式识别。 */
+    @Volatile
+    var onChunk: ((ShortArray) -> Unit)? = null
+
     private val _level = MutableStateFlow(0f)
     val level: StateFlow<Float> = _level.asStateFlow()
 
@@ -73,7 +77,9 @@ class Recorder(private val sampleRate: Int = SAMPLE_RATE) {
             while (recording) {
                 val read = rec.read(buffer, 0, buffer.size)
                 if (read > 0) {
-                    chunks.add(buffer.copyOf(read))
+                    val chunk = buffer.copyOf(read)
+                    chunks.add(chunk)
+                    onChunk?.invoke(chunk)
                     _level.value = rms(buffer, read)
                 }
             }

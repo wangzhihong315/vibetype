@@ -3,18 +3,19 @@ package com.vibetype
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.vibetype.asr.AsrResult
-import com.vibetype.asr.SenseVoice
+import com.vibetype.asr.Corrected
+import com.vibetype.asr.TermCorrector
+import com.vibetype.asr.XAsr
 import com.vibetype.audio.Recorder
 import com.vibetype.net.ConnState
 import com.vibetype.net.DesktopClient
 import com.vibetype.net.PairingStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 sealed interface ModelState {
@@ -31,6 +32,7 @@ data class Transcript(
     val asrMs: Long,
     val lang: String,
     val ack: AckState,
+    val corrected: Int = 0,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -38,6 +40,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val settings = PairingStore(app)
     val client = DesktopClient(settings)
     private val recorder = Recorder()
+    private val corrector = TermCorrector(app.assets)
 
     val level: StateFlow<Float> = recorder.level
     val connection: StateFlow<ConnState> = client.state
@@ -51,6 +54,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _recording = MutableStateFlow(false)
     val recording: StateFlow<Boolean> = _recording.asStateFlow()
 
+    /** 录音过程中不断增长的文字，用于浮层里的实时显示。 */
+    private val _partial = MutableStateFlow("")
+    val partial: StateFlow<String> = _partial.asStateFlow()
+
     private val _last = MutableStateFlow<Transcript?>(null)
     val last: StateFlow<Transcript?> = _last.asStateFlow()
 
@@ -60,7 +67,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _paired = MutableStateFlow(settings.paired)
     val paired: StateFlow<Boolean> = _paired.asStateFlow()
 
-    private var asr: SenseVoice? = null
+    private var asr: XAsr? = null
 
     /** debug 包才显示「自检」入口。 */
     val debuggable = (app.applicationInfo.flags and
@@ -72,7 +79,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             client.state.collect { state ->
                 if (state is ConnState.NeedsPairing) {
-                    // token 已经失效，清掉；地址留着，配对页还能直接带出来
                     settings.token = null
                     _paired.value = false
                 }
@@ -83,7 +89,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun loadModel() {
         if (_model.value is ModelState.Loading || _model.value is ModelState.Ready) return
         val app = getApplication<Application>()
-        if (!SenseVoice.isReady(app.assets)) {
+        if (!XAsr.isReady(app.assets)) {
             _model.value = ModelState.Missing
             return
         }
@@ -92,7 +98,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 if (asr == null) {
                     val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-                    asr = SenseVoice(app.assets, threads)
+                    asr = XAsr(app.assets, threads)
                 }
                 _model.value = ModelState.Ready
             } catch (e: OutOfMemoryError) {
@@ -106,9 +112,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun beginTalk() {
         if (_recording.value || _busy.value || _model.value !is ModelState.Ready) return
         _notice.value = null
+        _partial.value = ""
+
+        val engine = asr ?: run {
+            _notice.value = "模型还没准备好"
+            return
+        }
+        engine.start()
+        recorder.onChunk = { chunk ->
+            val text = try {
+                engine.accept(chunk)
+            } catch (e: Throwable) {
+                ""
+            }
+            if (text.isNotEmpty()) {
+                _partial.value = text
+            }
+        }
         if (recorder.start()) {
             _recording.value = true
         } else {
+            recorder.onChunk = null
+            engine.cancel()
             _notice.value = "麦克风打不开，检查录音权限"
         }
     }
@@ -116,29 +141,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun endTalk() {
         if (!_recording.value) return
         _recording.value = false
+        recorder.onChunk = null
         val pcm = recorder.stop()
-        val minSamples = Recorder.SAMPLE_RATE * 4 / 10 // 400 ms
+        val minSamples = Recorder.SAMPLE_RATE * 4 / 10
         if (pcm.size < minSamples) {
+            asr?.cancel()
+            _partial.value = ""
             _notice.value = "说话时间太短"
             return
         }
-        val trimmed = recorder.trimSilence(pcm)
-        if (trimmed.isEmpty()) {
-            _notice.value = "没听到声音"
-            return
-        }
-        process(trimmed)
+        finishAndSend(pcm.size * 1000 / Recorder.SAMPLE_RATE)
     }
 
     fun cancelTalk() {
         if (!_recording.value) return
         _recording.value = false
+        recorder.onChunk = null
         recorder.cancel()
+        asr?.cancel()
+        _partial.value = ""
+    }
+
+    /** 松手后补静音、取最终文本，走术语纠正再发送。 */
+    private fun finishAndSend(durationMs: Int) {
+        val engine = asr ?: return
+        _busy.value = true
+        viewModelScope.launch(Dispatchers.Default) {
+            val started = System.currentTimeMillis()
+            val raw = try {
+                engine.finish()
+            } catch (e: Throwable) {
+                ""
+            }
+            val elapsed = System.currentTimeMillis() - started
+            _partial.value = ""
+            if (raw.isBlank()) {
+                _notice.value = "没听清，再来一次"
+                _busy.value = false
+                return@launch
+            }
+            val corrected: Corrected = corrector.correct(raw)
+            val text = corrected.text
+            _last.value = Transcript(text, elapsed, "zh", AckState.Pending, corrected.changes)
+            val delivered = client.sendText(text, durationMs, "zh")
+            _last.value = _last.value?.copy(
+                ack = if (delivered) AckState.Delivered else AckState.Failed
+            )
+            _busy.value = false
+        }
     }
 
     /**
-     * 自检：把 assets 里的 16 kHz WAV 当成一次录音，跑完整的转写 + 发送。
-     * 模拟器上没法按住说话时用这个验链路。
+     * 自检：把 assets 里的 16 kHz WAV 当成一次实时录音，按 100 ms 喂给流式引擎。
      */
     fun selfTest() {
         if (_busy.value) return
@@ -154,7 +208,47 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _notice.value = "自检音频读取失败"
                 return@launch
             }
-            process(pcm)
+            val engine = asr ?: run {
+                _notice.value = "模型还没准备好"
+                return@launch
+            }
+
+            _busy.value = true
+            _partial.value = ""
+            engine.start()
+            var offset = 0
+            while (offset < pcm.size) {
+                val count = minOf(1600, pcm.size - offset)
+                val chunk = pcm.copyOfRange(offset, offset + count)
+                val text = try {
+                    engine.accept(chunk)
+                } catch (e: Throwable) {
+                    ""
+                }
+                if (text.isNotEmpty()) _partial.value = text
+                offset += count
+                delay(25)
+            }
+            val started = System.currentTimeMillis()
+            val raw = try {
+                engine.finish()
+            } catch (e: Throwable) {
+                ""
+            }
+            val elapsed = System.currentTimeMillis() - started
+            _partial.value = ""
+            if (raw.isBlank()) {
+                _notice.value = "自检没听到内容"
+                _busy.value = false
+                return@launch
+            }
+            val corrected = corrector.correct(raw)
+            _last.value = Transcript(corrected.text, elapsed, "zh", AckState.Pending, corrected.changes)
+            val delivered = client.sendText(corrected.text, pcm.size * 1000 / Recorder.SAMPLE_RATE, "zh")
+            _last.value = _last.value?.copy(
+                ack = if (delivered) AckState.Delivered else AckState.Failed
+            )
+            _busy.value = false
         }
     }
 
@@ -179,34 +273,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             offset += 8 + size + (size and 1)
         }
         return ShortArray(0)
-    }
-
-    private fun process(pcm: ShortArray) {
-        val engine = asr ?: run {
-            _notice.value = "模型还没准备好"
-            return
-        }
-        _busy.value = true
-        viewModelScope.launch(Dispatchers.Default) {
-            val result: AsrResult? = try {
-                engine.transcribe(pcm)
-            } catch (e: Throwable) {
-                null
-            }
-            if (result == null || result.text.isBlank()) {
-                _notice.value = "没听清，再来一次"
-                _busy.value = false
-                return@launch
-            }
-
-            val durationMs = pcm.size * 1000 / Recorder.SAMPLE_RATE
-            _last.value = Transcript(result.text, result.elapsedMs, result.lang, AckState.Pending)
-            val delivered = client.sendText(result.text, durationMs, result.lang)
-            _last.value = _last.value?.copy(
-                ack = if (delivered) AckState.Delivered else AckState.Failed
-            )
-            _busy.value = false
-        }
     }
 
     fun pair(host: String, port: Int, code: String) {
@@ -236,7 +302,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         recorder.cancel()
     }
 
-    /** 给 UI 用的耗时展示。 */
     fun formatMs(ms: Long): String = if (ms >= 1000) {
         val tenths = (ms / 100.0).roundToInt() / 10.0
         "${tenths}s"

@@ -91,7 +91,7 @@ class DesktopClient(private val settings: PairingStore) {
             .put("text", text)
             .put("ms", durationMs)
             .put("lang", lang)
-            .put("engine", "sensevoice-int8")
+            .put("engine", "x-asr")
             .toString()
 
         return try {
