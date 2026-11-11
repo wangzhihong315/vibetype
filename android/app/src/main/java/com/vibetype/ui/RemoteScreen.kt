@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -65,8 +66,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -76,6 +83,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,7 +111,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 private val PadTop = Color(0xFF1D1E24)
 private val PadBottom = Color(0xFF111216)
@@ -246,6 +260,8 @@ fun RemoteScreen(
             naturalScroll = naturalScroll,
             edgeScrollSpeed = edgeScrollSpeed,
             debuggable = vm.debuggable,
+            capsuleCount = capsules.size,
+            capsulePending = pendingCapsules,
             onDismiss = { showSettings = false },
             onSelfTest = {
                 showSettings = false
@@ -965,6 +981,9 @@ private fun DockKeys(
 /**
  * 胶囊键：轻点开列表，按住录一条。
  * 按下先等 240ms 再开麦克风，避免轻点时白录一段。
+ *
+ * 键上只放图形，不放文字：竖向胶囊 + 灵感星点。
+ * 按住时胶囊从下往上灌满，灌满即开录；录音时变成跳动的声波。
  */
 @Composable
 private fun CapsuleKey(
@@ -980,12 +999,21 @@ private fun CapsuleKey(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     var pressed by remember { mutableStateOf(false) }
-    val active = recording || (pressed && enabled)
     val hold = remember { Animatable(0f) }
     val scale by animateFloatAsState(
-        targetValue = if (pressed || recording) 0.97f else 1f,
+        targetValue = if (pressed || recording) 0.96f else 1f,
         animationSpec = tween(110),
         label = "capsuleScale",
+    )
+    val wave = rememberInfiniteTransition(label = "capsuleWave")
+    val wavePhase by wave.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(760, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "wave",
     )
     LaunchedEffect(pressed) {
         if (pressed) {
@@ -995,17 +1023,41 @@ private fun CapsuleKey(
         }
     }
 
+    val tint = when {
+        recording -> VibeCoral
+        pressed -> Color(0xFFFFE1D7)
+        enabled -> Color(0xFFFFF0EB)
+        else -> Color(0xFFF3F3F5)
+    }
+    val glyph = when {
+        recording -> Color.White
+        enabled -> VibeCoral
+        else -> VibeFaint.copy(alpha = 0.6f)
+    }
+
     Box(
         modifier
             .height(52.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(14.dp))
             .background(
-                when {
-                    recording -> VibeCoral
-                    active -> Color.White
-                    enabled -> Color.White
-                    else -> Color.White.copy(alpha = 0.45f)
+                if (recording) {
+                    Brush.linearGradient(listOf(VibeCoral, VibeCoral))
+                } else if (enabled) {
+                    Brush.verticalGradient(listOf(Color(0xFFFFF4F0), Color(0xFFFFE8E0)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFFF5F5F7), Color(0xFFEFEFF1)))
+                }
+            )
+            .then(
+                if (recording) {
+                    Modifier
+                } else {
+                    Modifier.border(
+                        width = 1.dp,
+                        color = if (enabled) VibeCoral.copy(alpha = 0.16f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    )
                 }
             )
             .pointerInput(enabled) {
@@ -1029,78 +1081,121 @@ private fun CapsuleKey(
                         if (released) onTap() else onCancel()
                     }
                 })
+            }
+            .semantics {
+                role = Role.Button
+                contentDescription = if (recording) "录音中" else "闪念胶囊"
             },
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // 闪念胶囊的图形：竖着的药丸 + 一颗灵感星点，比两个字显眼
-            Canvas(Modifier.size(17.dp, 23.dp)) {
-                val pillWidth = size.width
-                val pillHeight = size.height
-                val color = when {
-                    recording -> Color.White
-                    enabled -> VibeCoral
-                    else -> VibeFaint.copy(alpha = 0.55f)
-                }
-                drawRoundRect(
-                    color = color,
-                    size = androidx.compose.ui.geometry.Size(pillWidth, pillHeight),
-                    cornerRadius = CornerRadius(pillWidth / 2f, pillWidth / 2f),
-                )
-                // 上下两半的分界
-                drawLine(
-                    color = Color.White.copy(alpha = 0.65f),
-                    start = Offset(0f, pillHeight * 0.5f),
-                    end = Offset(pillWidth, pillHeight * 0.5f),
-                    strokeWidth = 1.4f,
-                )
-                // 顶部的灵感点
-                drawCircle(
-                    color = Color.White,
-                    radius = pillWidth * 0.13f,
-                    center = Offset(pillWidth * 0.34f, pillHeight * 0.24f),
-                )
-            }
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = if (recording) "录音中" else "胶囊",
-                fontSize = if (recording) 9.sp else 9.sp,
-                color = when {
-                    recording -> Color.White
-                    enabled -> VibeInk
-                    else -> VibeFaint
-                },
-            )
-        }
+        CapsuleGlyph(
+            fill = glyph,
+            cutout = tint,
+            progress = hold.value,
+            recording = recording,
+            wave = wavePhase,
+            modifier = Modifier.size(26.dp, 33.dp),
+        )
 
         // 还没同步到电脑的条数
         if (pending > 0 && !recording) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 5.dp, end = 6.dp)
-                    .size(15.dp)
+                    .padding(top = 5.dp, end = 5.dp)
+                    .size(16.dp)
                     .clip(CircleShape)
-                    .background(VibeCoral),
+                    .background(VibeCoral)
+                    .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = if (pending > 9) "9+" else "$pending",
                     fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color.White,
                 )
             }
         }
+    }
+}
 
-        // 按住 240ms 的开麦进度：让用户知道“再按一下就开录”
-        if (pressed && !recording) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth(hold.value)
-                    .height(3.dp)
-                    .background(VibeCoral)
+/**
+ * 闪念胶囊的图形标记：一颗竖着的药丸，中缝 + 一颗灵感星。
+ * 只在胶囊相关的界面里复用，不参与其它图标体系。
+ */
+@Composable
+private fun CapsuleGlyph(
+    fill: Color,
+    cutout: Color,
+    progress: Float,
+    recording: Boolean,
+    wave: Float,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val pillW = size.width * 0.74f
+        val pillH = size.height * 0.92f
+        val top = size.height - pillH
+        val radius = CornerRadius(pillW / 2f, pillW / 2f)
+        val pillTopLeft = Offset(0f, top)
+        val pillSize = Size(pillW, pillH)
+        drawRoundRect(fill, pillTopLeft, pillSize, radius)
+
+        if (recording) {
+            // 录音时药丸是白的，里面三根声波用键底色挖出来
+            val barW = pillW * 0.15f
+            val gap = pillW * 0.10f
+            repeat(3) { i ->
+                val phase = (wave + i * 0.22f) % 1f
+                val level = 0.5f + 0.5f * sin(phase * 2f * PI.toFloat())
+                val h = pillH * (0.24f + 0.24f * level)
+                val x = pillW / 2f + (i - 1) * (barW + gap) - barW / 2f
+                drawRoundRect(
+                    color = cutout,
+                    topLeft = Offset(x, top + (pillH - h) / 2f),
+                    size = Size(barW, h),
+                    cornerRadius = CornerRadius(barW / 2f, barW / 2f),
+                )
+            }
+        } else {
+            // 按住时从底部往上灌满
+            if (progress > 0f) {
+                val clip = Path().apply {
+                    addRoundRect(RoundRect(Rect(pillTopLeft, pillSize), radius))
+                }
+                val filled = pillH * progress
+                clipPath(clip) {
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.42f),
+                        topLeft = Offset(0f, top + pillH - filled),
+                        size = Size(pillW, filled),
+                    )
+                }
+            }
+            // 中缝
+            drawLine(
+                color = Color.White.copy(alpha = 0.9f),
+                start = Offset(pillW * 0.16f, top + pillH * 0.58f),
+                end = Offset(pillW * 0.84f, top + pillH * 0.58f),
+                strokeWidth = size.width * 0.06f,
+                cap = StrokeCap.Round,
             )
+            // 灵感星点
+            val starCx = pillW * 0.56f
+            val starCy = top + pillH * 0.28f
+            val rOut = pillW * 0.23f
+            val rIn = rOut * 0.32f
+            val star = Path()
+            for (i in 0 until 8) {
+                val angle = (-PI / 2 + i * PI / 4).toFloat()
+                val r = if (i % 2 == 0) rOut else rIn
+                val x = starCx + cos(angle) * r
+                val y = starCy + sin(angle) * r
+                if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
+            }
+            star.close()
+            drawPath(star, Color.White)
         }
     }
 }
@@ -1213,6 +1308,8 @@ private fun SettingsSheet(
     naturalScroll: Boolean,
     edgeScrollSpeed: Float,
     debuggable: Boolean,
+    capsuleCount: Int,
+    capsulePending: Int,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
     onSpeedChange: (Float) -> Unit,
@@ -1344,10 +1441,7 @@ private fun SettingsSheet(
             }
 
             Spacer(Modifier.height(16.dp))
-            SettingsGroup("胶囊") {
-                SettingsRow(title = "保存位置", value = "这台手机")
-                SettingsRow(title = "转写", value = "手机本地")
-            }
+            CapsuleSettingsCard(count = capsuleCount, pending = capsulePending)
 
             if (debuggable) {
                 Spacer(Modifier.height(16.dp))
@@ -1358,6 +1452,90 @@ private fun SettingsSheet(
 
             Spacer(Modifier.height(22.dp))
             Text("VibeType 0.1.0 · X-ASR", fontSize = 11.sp, color = VibeFaint)
+        }
+    }
+}
+
+
+/**
+ * 设置里的胶囊卡片：不并进普通分组，用浅珊瑚底和图形把自己区分出来。
+ */
+@Composable
+private fun CapsuleSettingsCard(count: Int, pending: Int) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFFFF4F0))
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                CapsuleGlyph(
+                    fill = VibeCoral,
+                    cutout = Color.White,
+                    progress = 0f,
+                    recording = false,
+                    wave = 0f,
+                    modifier = Modifier.size(16.dp, 21.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "闪念胶囊",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = VibeInk,
+                    )
+                    if (count > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "$count",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VibeCoral,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(VibeCoral.copy(alpha = 0.13f))
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text("按住胶囊键，说一句就存下来", fontSize = 11.sp, color = VibeMuted)
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Color(0x0F000000))
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("手机本地转写 · 不上传云端", fontSize = 11.sp, color = VibeMuted)
+            Spacer(Modifier.weight(1f))
+            when {
+                pending > 0 -> Text("$pending 条待同步", fontSize = 11.sp, color = VibeCoral)
+                count > 0 -> Text("已同步", fontSize = 11.sp, color = Color(0xFF1F9D43))
+            }
         }
     }
 }
@@ -1854,10 +2032,27 @@ private fun CapsuleList(
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            CapsuleGlyph(
+                fill = VibeCoral,
+                cutout = Color.White,
+                progress = 0f,
+                recording = false,
+                wave = 0f,
+                modifier = Modifier.size(18.dp, 23.dp),
+            )
+            Spacer(Modifier.width(8.dp))
             Text("闪念胶囊", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
             if (items.isNotEmpty()) {
                 Spacer(Modifier.width(7.dp))
-                Text("${items.size}", fontSize = 13.sp, color = VibeFaint)
+                Text(
+                    "${items.size}",
+                    fontSize = 11.sp,
+                    color = VibeCoral,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(VibeCoral.copy(alpha = 0.12f))
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                )
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) {
@@ -1874,18 +2069,25 @@ private fun CapsuleList(
             ) {
                 Box(
                     Modifier
-                        .size(54.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF2F3F5)),
+                        .background(Color(0xFFFFF0EB)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("＋", fontSize = 24.sp, color = VibeFaint)
+                    CapsuleGlyph(
+                        fill = VibeCoral,
+                        cutout = Color(0xFFFFF0EB),
+                        progress = 0f,
+                        recording = false,
+                        wave = 0f,
+                        modifier = Modifier.size(21.dp, 27.dp),
+                    )
                 }
-                Spacer(Modifier.height(14.dp))
-                Text("还没有胶囊", fontSize = 15.sp, color = VibeInk)
+                Spacer(Modifier.height(16.dp))
+                Text("还没有胶囊", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VibeInk)
                 Spacer(Modifier.height(7.dp))
                 Text(
-                    "按住遥控器上的胶囊键，把刚才想到的那句话留下来。",
+                    "按住胶囊键，说一句就存下来。\n灵感先收着，整理以后再说。",
                     fontSize = 12.sp,
                     lineHeight = 19.sp,
                     color = VibeMuted,
@@ -1921,6 +2123,16 @@ private fun CapsuleList(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
                                     .background(Color(0x1F30D158))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                        } else {
+                            Text(
+                                "待同步",
+                                fontSize = 10.sp,
+                                color = VibeCoral,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(VibeCoral.copy(alpha = 0.12f))
                                     .padding(horizontal = 7.dp, vertical = 2.dp),
                             )
                         }
