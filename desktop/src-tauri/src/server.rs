@@ -134,6 +134,11 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
     send_line(&mut writer, welcome).await?;
 
     state.connected_delta(1);
+    if !name.is_empty() {
+        state.set_device(&name);
+    } else if !platform.is_empty() {
+        state.set_device(&platform);
+    }
 
     loop {
         let line = match timeout(IDLE_TIMEOUT, lines.next_line()).await {

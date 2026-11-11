@@ -42,6 +42,7 @@ pub struct UiState {
     pub injection: String,
     pub history: Vec<Entry>,
     pub connected: u32,
+    pub device: String,
     pub platform: String,
 }
 
@@ -65,6 +66,8 @@ pub struct Inner {
     pub history: Vec<Entry>,
     pub injection: String,
     pub connected: u32,
+    /// 最近连上的设备名（手机型号）
+    pub device: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -98,6 +101,7 @@ impl AppState {
             history: Vec::new(),
             injection: injection.to_string(),
             connected: 0,
+            device: String::new(),
         };
         Self {
             app,
@@ -120,6 +124,7 @@ impl AppState {
             injection: inner.injection.clone(),
             history: inner.history.clone(),
             connected: inner.connected,
+            device: inner.device.clone(),
             platform: std::env::consts::OS.to_string(),
         }
     }
@@ -201,6 +206,25 @@ impl AppState {
         {
             let mut inner = self.lock();
             inner.connected = (inner.connected as i32 + delta).max(0) as u32;
+        }
+        self.emit_state();
+    }
+
+    pub fn set_device(&self, name: &str) {
+        {
+            let mut inner = self.lock();
+            inner.device = name.to_string();
+        }
+        self.emit_state();
+    }
+
+    /// 撤销所有已配对设备，手机下次连接必须重新输配对码。
+    pub fn revoke_devices(&self) {
+        {
+            let mut inner = self.lock();
+            inner.devices.clear();
+            inner.device.clear();
+            save_devices(&self.app, &inner.devices);
         }
         self.emit_state();
     }

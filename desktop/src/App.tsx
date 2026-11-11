@@ -13,6 +13,7 @@ type UiState = {
   injection: string;
   history: Entry[];
   connected: number;
+  device: string;
   platform: string;
 };
 
@@ -32,14 +33,35 @@ function time(ms: number) {
 export default function App() {
   const [state, setState] = useState<UiState | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [autostart, setAutostart] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   useEffect(() => {
     invoke<UiState>("ui_state").then(setState).catch(console.error);
+    invoke<boolean>("autostart_enabled").then(setAutostart).catch(() => {});
     const unlisten = listen<UiState>("state", (event) => setState(event.payload));
     return () => {
       unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
+
+  async function toggleAutostart() {
+    try {
+      setAutostart(await invoke<boolean>("set_autostart", { enabled: !autostart }));
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function revokeDevices() {
+    if (!confirmRevoke) {
+      setConfirmRevoke(true);
+      window.setTimeout(() => setConfirmRevoke(false), 3000);
+      return;
+    }
+    setConfirmRevoke(false);
+    setState(await invoke<UiState>("revoke_devices"));
+  }
 
   async function setMode(mode: string) {
     setState(await invoke<UiState>("set_injection", { mode }));
@@ -85,7 +107,13 @@ export default function App() {
         </div>
         <div className={state.connected > 0 ? "pill on" : "pill"}>
           <i />
-          {state.connected > 0 ? "手机已连接" : "等待连接"}
+          <span className="pill-text">
+            {state.connected > 0
+              ? state.device
+                ? `${state.device} 已连接`
+                : "手机已连接"
+              : "等待连接"}
+          </span>
         </div>
       </header>
 
@@ -149,6 +177,25 @@ export default function App() {
           </ul>
         )}
       </section>
+
+      <div className="settings">
+        <button
+          className={autostart ? "toggle on" : "toggle"}
+          onClick={toggleAutostart}
+          aria-pressed={autostart}
+          aria-label="开机自启"
+        >
+          <span className="knob" />
+        </button>
+        <span className="setting-label">开机自启</span>
+        <span className="spacer" />
+        <button
+          className={confirmRevoke ? "ghost danger" : "ghost"}
+          onClick={revokeDevices}
+        >
+          {confirmRevoke ? "再点一次确认移除" : "移除已配对手机"}
+        </button>
+      </div>
 
       <footer>
         <div className="seg" role="group" aria-label="上屏方式">

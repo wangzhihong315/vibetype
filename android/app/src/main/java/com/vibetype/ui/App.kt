@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -53,9 +54,14 @@ import com.vibetype.VibeOrange
 import com.vibetype.VibeTypeTheme
 import com.vibetype.Transcript
 import com.vibetype.net.ConnState
+import kotlinx.coroutines.delay
 
 @Composable
-fun App(vm: MainViewModel) {
+fun App(
+    vm: MainViewModel,
+    micGranted: Boolean = true,
+    onRequestMic: () -> Unit = {},
+) {
     val paired by vm.paired.collectAsState()
     val conn by vm.connection.collectAsState()
     val model by vm.model.collectAsState()
@@ -64,6 +70,13 @@ fun App(vm: MainViewModel) {
     val level by vm.level.collectAsState()
     val last by vm.last.collectAsState()
     val notice by vm.notice.collectAsState()
+
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            delay(3_500)
+            vm.clearNotice()
+        }
+    }
 
     VibeTypeTheme {
         Box(
@@ -81,8 +94,11 @@ fun App(vm: MainViewModel) {
                     last = last,
                     notice = notice,
                     debuggable = vm.debuggable,
+                    micGranted = micGranted,
                     formatMs = vm::formatMs,
-                    onBegin = vm::beginTalk,
+                    onBegin = {
+                        if (micGranted) vm.beginTalk() else onRequestMic()
+                    },
                     onEnd = vm::endTalk,
                     onCancel = vm::cancelTalk,
                     onSelfTest = vm::selfTest,
@@ -110,6 +126,7 @@ private fun HomeScreen(
     last: Transcript?,
     notice: String?,
     debuggable: Boolean,
+    micGranted: Boolean,
     formatMs: (Long) -> String,
     onBegin: () -> Unit,
     onEnd: () -> Unit,
@@ -164,7 +181,7 @@ private fun HomeScreen(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = subtitle(conn, model),
+            text = subtitle(conn, model, micGranted),
             fontSize = 14.sp,
             color = VibeMuted,
             modifier = Modifier.fillMaxWidth(),
@@ -209,7 +226,8 @@ private fun HomeScreen(
     }
 }
 
-private fun subtitle(conn: ConnState, model: ModelState): String = when {
+private fun subtitle(conn: ConnState, model: ModelState, micGranted: Boolean): String = when {
+    !micGranted -> "点一下按钮，允许使用麦克风"
     conn is ConnState.Failed -> conn.message
     conn is ConnState.Connecting -> "正在连接电脑…"
     conn is ConnState.Connected -> {

@@ -40,7 +40,11 @@ class MainActivity : ComponentActivity() {
                 if (!granted) launcher.launch(Manifest.permission.RECORD_AUDIO)
             }
 
-            App(vm)
+            App(
+                vm = vm,
+                micGranted = granted,
+                onRequestMic = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
+            )
         }
     }
 

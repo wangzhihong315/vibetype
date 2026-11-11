@@ -5,6 +5,7 @@ mod state;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 #[tauri::command]
 fn ui_state(state: tauri::State<'_, state::AppState>) -> state::UiState {
@@ -30,12 +31,38 @@ fn clear_history(state: tauri::State<'_, state::AppState>) -> state::UiState {
 }
 
 #[tauri::command]
+fn revoke_devices(state: tauri::State<'_, state::AppState>) -> state::UiState {
+    state.revoke_devices();
+    state.snapshot()
+}
+
+#[tauri::command]
+fn autostart_enabled(app: tauri::AppHandle) -> bool {
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[tauri::command]
+fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())?;
+    } else {
+        manager.disable().map_err(|e| e.to_string())?;
+    }
+    manager.is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn open_permission_settings() {
     inject::open_settings();
 }
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
             let handle = app.handle().clone();
             let state = state::AppState::new(handle);
@@ -87,6 +114,9 @@ pub fn run() {
             regenerate_code,
             set_injection,
             clear_history,
+            revoke_devices,
+            autostart_enabled,
+            set_autostart,
             open_permission_settings
         ])
         .run(tauri::generate_context!())
