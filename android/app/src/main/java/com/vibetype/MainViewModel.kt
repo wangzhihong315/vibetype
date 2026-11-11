@@ -62,10 +62,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private var asr: SenseVoice? = null
 
-    // 内部私有目录：adb push 到外部目录的模型在 Android 11+ 上 App 读不到（FUSE 归属），
-    // 调试时用 tools/push_model.sh 走 run-as 管道灌进来。
-    val modelDir = SenseVoice.modelDir(app.filesDir)
-
     /** debug 包才显示「自检」入口。 */
     val debuggable = (app.applicationInfo.flags and
         android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -86,12 +82,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadModel() {
         if (_model.value is ModelState.Loading || _model.value is ModelState.Ready) return
-        android.util.Log.i(
-            "VibeType",
-            "modelDir=$modelDir ready=${SenseVoice.isReady(modelDir)} " +
-                "model=${java.io.File(modelDir, SenseVoice.MODEL_FILE).length()}"
-        )
-        if (!SenseVoice.isReady(modelDir)) {
+        val app = getApplication<Application>()
+        if (!SenseVoice.isReady(app.assets)) {
             _model.value = ModelState.Missing
             return
         }
@@ -100,7 +92,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 if (asr == null) {
                     val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-                    asr = SenseVoice(modelDir, threads)
+                    asr = SenseVoice(app.assets, threads)
                 }
                 _model.value = ModelState.Ready
             } catch (e: OutOfMemoryError) {

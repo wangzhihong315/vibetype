@@ -30,7 +30,7 @@ TCP 长连接（NDJSON）   ── 几十字节 ──▶  桌面端
 | 录音 | `AudioRecord` 16 kHz / 16 bit / 单声道 | SenseVoice 固定输入 |
 | 端点 | 按住说话，松开结束；首尾按能量裁剪 | 不用 VAD 模型，v0.1 保持简单 |
 | 识别 | sherpa-onnx `OfflineRecognizer` + SenseVoice int8 | CPU，arm64-v8a |
-| 模型分发 | 首次启动下载到 `filesDir/model/`（待实现）；调试用 `tools/push_model.sh` 走 run-as 管道 | 不打进 APK；可单独换模型 |
+| 模型分发 | 随 APK 打包进 `assets/models/sensevoice/`（228 MB，APK 约 284 MB） | 无需首次下载；换模型要重新发版 |
 | 网络 | 前台 TCP 客户端，NDJSON | 断线指数退避重连 |
 | 配对 | 扫二维码（host/port/token）或手输六位码 | token 存 SharedPreferences |
 
@@ -73,7 +73,8 @@ src-tauri/src/
   常用术语替换表（JSON / README / API 等）；或在桌面端做一次轻量后处理。
 - **速度**：4.8 秒录音在 arm64 模拟器上转写 410 ms（RTF ≈ 0.09），真机（红米 K80）
   还没测。模拟器与真机 CPU 调度差异较大，这个数字只能当量级参考。
-- **首次下载模型**还没做：目前调试靠 `tools/push_model.sh`，发布前要补下载与校验。
+- **安装包体积**：模型（228 MB）随 APK 打包，debug APK 约 284 MB。GitHub 单文件
+  限制 100 MB，所以模型不进仓库，构建前用 `tools/fetch_model.sh` 拉取；CI 也走这一步。
 
 ## 安全模型
 

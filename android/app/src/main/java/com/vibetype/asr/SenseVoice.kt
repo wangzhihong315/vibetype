@@ -1,11 +1,11 @@
 package com.vibetype.asr
 
+import android.content.res.AssetManager
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
-import java.io.File
 
 data class AsrResult(
     val text: String,
@@ -16,10 +16,10 @@ data class AsrResult(
 )
 
 /**
- * SenseVoiceSmall int8，跑在手机 CPU 上。
+ * SenseVoiceSmall int8，模型随 APK 一起打包，直接从 assets 加载。
  * 非自回归，一段话一次前向；不用网络。
  */
-class SenseVoice(modelDir: File, threads: Int = 4) {
+class SenseVoice(assets: AssetManager, threads: Int = 4) {
 
     private val recognizer: OfflineRecognizer
 
@@ -28,18 +28,18 @@ class SenseVoice(modelDir: File, threads: Int = 4) {
             featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
             modelConfig = OfflineModelConfig(
                 senseVoice = OfflineSenseVoiceModelConfig(
-                    model = File(modelDir, "model.int8.onnx").absolutePath,
+                    model = "$ASSET_DIR/model.int8.onnx",
                     language = "auto",
                     useInverseTextNormalization = true,
                 ),
-                tokens = File(modelDir, "tokens.txt").absolutePath,
+                tokens = "$ASSET_DIR/tokens.txt",
                 numThreads = threads,
                 debug = false,
                 provider = "cpu",
             ),
             decodingMethod = "greedy_search",
         )
-        recognizer = OfflineRecognizer(config = config)
+        recognizer = OfflineRecognizer(assetManager = assets, config = config)
     }
 
     fun transcribe(pcm16: ShortArray): AsrResult {
@@ -67,14 +67,14 @@ class SenseVoice(modelDir: File, threads: Int = 4) {
     }
 
     companion object {
-        const val MODEL_FILE = "model.int8.onnx"
-        const val TOKENS_FILE = "tokens.txt"
+        const val ASSET_DIR = "models/sensevoice"
 
-        fun modelDir(base: File): File = File(base, "models/sensevoice")
-
-        fun isReady(dir: File): Boolean {
-            val model = File(dir, MODEL_FILE)
-            return model.isFile && model.length() > 0 && File(dir, TOKENS_FILE).isFile
+        fun isReady(assets: AssetManager): Boolean = try {
+            assets.open("$ASSET_DIR/model.int8.onnx").close()
+            assets.open("$ASSET_DIR/tokens.txt").close()
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

@@ -47,10 +47,12 @@ v0.1 正在开发：按住说话 → 本地转写 → 电脑上屏。
 - [x] Android：录音、SenseVoice、配对、发送
 - [x] macOS / Windows：配对、接收、注入
 - [x] 端到端实测：手机本地转写 → 文字打进 Mac 的 TextEdit
-- [x] 模拟器实测：4.8 秒录音转写 410 ms（RTF ≈ 0.09）
+- [x] 模拟器实测：4.8 秒录音转写 410–650 ms（RTF ≈ 0.09–0.13）
+- [x] macOS 安装包（本地与 CI）
+- [x] Windows 安装包（CI：NSIS + MSI）
+- [x] 模型随 APK 打包（APK 约 284 MB，安装后无需下载）
 - [ ] 真机（K80）RTF 与识别质量
-- [ ] 模型首次启动下载
-- [ ] Windows 安装包（CI 已就绪，待仓库）
+- [ ] 英文术语识别（JSON 被听成 “J song”）
 - [ ] 胶囊（v0.2）、触控板（v0.3）
 
 ## 开发
@@ -65,16 +67,15 @@ ANDROID_HOME=/opt/homebrew/share/android-commandlinetools \
 ./gradlew assembleDebug
 ```
 
-模型不进 APK。调试时用脚本灌进内部私有目录（Android 11+ 直接 `adb push` 到
-`Android/data` 的文件，App 读不到）：
+模型随 APK 打包，构建前先拉一次（228 MB，缓存在 `.cache/`，不进 git）：
 
 ```bash
-tools/push_model.sh /path/to/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+tools/fetch_model.sh
 ```
 
-debug 包的首页底部有「自检」按钮：把内置的一段 16 kHz 录音跑一遍完整的
-转写 + 发送，用来在没有真机麦克风时验链路。
+产物 `app/build/outputs/apk/debug/app-debug.apk` 约 **284 MB**。debug 包首页底部有
+「自检」按钮：把内置的一段 16 kHz 录音跑一遍完整的转写 + 发送，用来在没有真机
+麦克风时验链路。
 
 ### 桌面端
 
@@ -85,7 +86,8 @@ npm run tauri dev        # 开发
 npm run tauri build      # 本机安装包
 ```
 
-macOS 首次启动会请求「辅助功能」权限；Windows 对管理员权限运行的目标程序需要同权限运行 VibeType。
+macOS 首次启动会请求「辅助功能」权限；系统还会问是否允许 VibeType 接受传入连接，
+要点「允许」，否则手机连不上。Windows 对管理员权限运行的目标程序需要同权限运行 VibeType。
 
 没有手机也能测通链路：
 
