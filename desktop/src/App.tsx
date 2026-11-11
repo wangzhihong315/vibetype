@@ -66,7 +66,7 @@ const NAV: { id: Page; label: string; icon: string }[] = [
   {
     id: "capsules",
     label: "胶囊",
-    icon: '<rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M12 7.5v2.5"/>',
+    icon: '<rect x="9" y="3.5" width="6" height="17" rx="3" fill="currentColor" fill-opacity="0.16"/><rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M9 12h6"/><circle cx="10.7" cy="7.2" r="0.9" fill="currentColor" stroke="none"/>',
   },
   {
     id: "mcp",

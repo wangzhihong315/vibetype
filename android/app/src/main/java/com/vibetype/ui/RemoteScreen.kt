@@ -930,7 +930,7 @@ private fun DockKeys(
             listOf(
                 KeySlot("k1", "回车"),
                 KeySlot("k2", "删除"),
-                KeySlot("k3", "esc"),
+                KeySlot("k3", "Esc"),
                 KeySlot("k4", "切换"),
                 KeySlot("k5", "自定义"),
             )
@@ -1032,19 +1032,39 @@ private fun CapsuleKey(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (active) {
-                Box(
-                    Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(if (recording) Color.White else VibeCoral)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // 闪念胶囊的图形：竖着的药丸 + 一颗灵感星点，比两个字显眼
+            Canvas(Modifier.size(17.dp, 23.dp)) {
+                val pillWidth = size.width
+                val pillHeight = size.height
+                val color = when {
+                    recording -> Color.White
+                    enabled -> VibeCoral
+                    else -> VibeFaint.copy(alpha = 0.55f)
+                }
+                drawRoundRect(
+                    color = color,
+                    size = androidx.compose.ui.geometry.Size(pillWidth, pillHeight),
+                    cornerRadius = CornerRadius(pillWidth / 2f, pillWidth / 2f),
                 )
-                Spacer(Modifier.width(5.dp))
+                // 上下两半的分界
+                drawLine(
+                    color = Color.White.copy(alpha = 0.65f),
+                    start = Offset(0f, pillHeight * 0.5f),
+                    end = Offset(pillWidth, pillHeight * 0.5f),
+                    strokeWidth = 1.4f,
+                )
+                // 顶部的灵感点
+                drawCircle(
+                    color = Color.White,
+                    radius = pillWidth * 0.13f,
+                    center = Offset(pillWidth * 0.34f, pillHeight * 0.24f),
+                )
             }
+            Spacer(Modifier.height(3.dp))
             Text(
                 text = if (recording) "录音中" else "胶囊",
-                fontSize = if (recording) 10.sp else 12.sp,
+                fontSize = if (recording) 9.sp else 9.sp,
                 color = when {
                     recording -> Color.White
                     enabled -> VibeInk

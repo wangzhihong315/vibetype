@@ -150,6 +150,15 @@ impl AppState {
         let capsules = load_json::<Vec<Capsule>>(&app, "capsules.json").unwrap_or_default();
         let keymap = load_json::<Vec<KeySlot>>(&app, "keymap.json")
             .filter(|slots| valid_keymap(slots))
+            .map(|mut slots| {
+                // 老配置里是小写 esc，顺手归一
+                for slot in &mut slots {
+                    if slot.label == "esc" {
+                        slot.label = "Esc".into();
+                    }
+                }
+                slots
+            })
             .unwrap_or_else(default_keymap);
         let history = load_json::<Vec<Entry>>(&app, "history.json").unwrap_or_default();
         let injection = match std::env::var("VIBETYPE_INJECT").as_deref() {
@@ -549,7 +558,7 @@ pub fn default_keymap() -> Vec<KeySlot> {
         },
         KeySlot {
             id: "k3".into(),
-            label: "esc".into(),
+            label: "Esc".into(),
             action: "key".into(),
             key: "escape".into(),
             modifiers: vec![],
