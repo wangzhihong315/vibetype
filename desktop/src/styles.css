@@ -6,9 +6,60 @@
   --blue: #0a84ff;
   --green: #30d158;
   --coral: #ff6b4a;
+  --orange: #ff9f0a;
   --line: rgba(0, 0, 0, 0.07);
+  --line-strong: rgba(0, 0, 0, 0.12);
   --card: #ffffff;
   --fill: #f5f5f7;
+  --sidebar: #fbfbfd;
+  --hover: rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-nav: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  --seg: #e5e5ea;
+  --seg-on: #ffffff;
+  --scroll: rgba(0, 0, 0, 0.16);
+  --toast: rgba(29, 29, 31, 0.9);
+  --on-accent: #ffffff;
+  --amber-ink: #c77800;
+  --dot-off: #c7c7cc;
+  --ver: #a6a6ab;
+  --code-bg: #1d1e24;
+  --code-ink: #e8e9ee;
+  --knob: #ffffff;
+  --blue-tint: rgba(10, 132, 255, 0.1);
+  --coral-tint: rgba(255, 107, 74, 0.09);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0c0e;
+  --ink: #f2f2f7;
+  --muted: #aeaeb2;
+  --faint: #8a8a8e;
+  --blue: #4da3ff;
+  --green: #32d74b;
+  --coral: #ff7a5c;
+  --orange: #ff9f0a;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --card: #17181d;
+  --fill: #232429;
+  --sidebar: #101115;
+  --hover: rgba(255, 255, 255, 0.06);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-nav: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --seg: #26272d;
+  --seg-on: #3a3b42;
+  --scroll: rgba(255, 255, 255, 0.16);
+  --toast: rgba(44, 45, 52, 0.95);
+  --on-accent: #ffffff;
+  --amber-ink: #ffb340;
+  --dot-off: #5a5b63;
+  --ver: #8a8a8e;
+  --code-bg: #0e0f12;
+  --code-ink: #e8e9ee;
+  --knob: #f2f2f7;
+  --blue-tint: rgba(77, 163, 255, 0.16);
+  --coral-tint: rgba(255, 122, 92, 0.16);
 }
 
 * {
@@ -58,7 +109,7 @@ button {
 .sidebar {
   width: 196px;
   flex: 0 0 196px;
-  background: #fbfbfd;
+  background: var(--sidebar);
   border-right: 1px solid var(--line);
   padding: 18px 12px 14px;
   display: flex;
@@ -119,13 +170,13 @@ button {
 }
 
 .nav-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--hover);
 }
 
 .nav-item.on {
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--shadow-nav);
 }
 
 .nav-item.on svg {
@@ -158,14 +209,14 @@ button {
 
 .sb-foot .ver {
   margin-top: 4px;
-  color: #a6a6ab;
+  color: var(--ver);
 }
 
 .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #c7c7cc;
+  background: var(--dot-off);
   flex: 0 0 6px;
 }
 
@@ -221,7 +272,7 @@ button {
   background: var(--card);
   border-radius: 16px;
   padding: 15px 16px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .card.grow {
@@ -299,7 +350,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .status-card .k {
@@ -382,14 +433,14 @@ button {
   place-items: center;
   font-size: 12px;
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
   text-align: center;
   padding: 0 10px;
 }
 
 .quick.primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* 连接 */
@@ -399,7 +450,7 @@ button {
   background: var(--card);
   border-radius: 16px;
   padding: 18px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .pair {
@@ -472,7 +523,7 @@ button {
   height: 19px;
   flex: 0 0 19px;
   border-radius: 50%;
-  background: rgba(10, 132, 255, 0.1);
+  background: var(--blue-tint);
   color: var(--blue);
   font-size: 11px;
   display: grid;
@@ -554,7 +605,7 @@ button {
 .danger-btn {
   height: 38px;
   border-radius: 11px;
-  background: rgba(255, 107, 74, 0.09);
+  background: var(--coral-tint);
   color: var(--coral);
   font-size: 12px;
   display: grid;
@@ -564,7 +615,7 @@ button {
 
 .danger-btn.on {
   background: var(--coral);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* 胶囊 */
@@ -582,7 +633,7 @@ button {
   border-radius: 16px;
   padding: 8px;
   overflow-y: auto;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .ientry {
@@ -618,7 +669,7 @@ button {
 
 .tag.wait {
   background: rgba(255, 159, 10, 0.14);
-  color: #c77800;
+  color: var(--amber-ink);
 }
 
 .ientry .x {
@@ -639,7 +690,7 @@ button {
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .inbox-detail .t {
@@ -674,11 +725,11 @@ button {
 
 .pill-btn.primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .pill-btn.danger {
-  background: rgba(255, 107, 74, 0.09);
+  background: var(--coral-tint);
   color: var(--coral);
 }
 
@@ -710,7 +761,7 @@ button {
   background: var(--card);
   border-radius: 999px;
   padding: 6px 11px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .tabs {
@@ -729,14 +780,14 @@ button {
 }
 
 .tab.on {
-  background: rgba(10, 132, 255, 0.1);
+  background: var(--blue-tint);
   color: var(--blue);
 }
 
 .codeblock {
   margin: 0;
-  background: #1d1e24;
-  color: #e8e9ee;
+  background: var(--code-bg);
+  color: var(--code-ink);
   border-radius: 11px;
   padding: 12px 14px;
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
@@ -795,7 +846,7 @@ button {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--knob);
 }
 
 .row-item {
@@ -857,16 +908,16 @@ button {
 }
 
 .seg button.on {
-  background: #fff;
+  background: var(--seg-on);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .toggle {
   width: 42px;
   height: 25px;
   border-radius: 999px;
-  background: #e5e5ea;
+  background: var(--seg);
   position: relative;
   transition: background 0.15s ease;
   flex: 0 0 42px;
@@ -879,7 +930,7 @@ button {
   width: 21px;
   height: 21px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--knob);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
@@ -896,8 +947,8 @@ button {
   position: sticky;
   bottom: 8px;
   align-self: center;
-  background: rgba(29, 29, 31, 0.9);
-  color: #fff;
+  background: var(--toast);
+  color: var(--on-accent);
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 12px;
@@ -923,7 +974,7 @@ button {
 }
 
 .client.on {
-  background: rgba(10, 132, 255, 0.1);
+  background: var(--blue-tint);
   color: var(--blue);
   font-weight: 500;
 }
@@ -1138,7 +1189,7 @@ button.cmd .link {
 }
 
 .main::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--scroll);
   border-radius: 5px;
   border: 2px solid var(--bg);
 }
