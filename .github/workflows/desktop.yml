@@ -1,0 +1,54 @@
+name: desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
+      - name: Build
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          npm rebuild esbuild
+          npm run tauri build -- --target aarch64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vibetype-macos-arm64
+          path: desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/**
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
+      - name: Build
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          npm rebuild esbuild
+          npm run tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vibetype-windows-x64
+          path: desktop/src-tauri/target/release/bundle/**
