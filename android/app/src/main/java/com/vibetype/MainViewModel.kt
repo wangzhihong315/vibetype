@@ -275,8 +275,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return ShortArray(0)
     }
 
-    fun pair(host: String, port: Int, code: String) {
-        settings.save(host.trim(), port, code.trim())
+    fun sendMove(dx: Float, dy: Float) = client.sendPointer("move", "", dx, dy)
+
+    fun sendScroll(dx: Float, dy: Float) = client.sendPointer("scroll", "", dx, dy)
+
+    fun sendClick(button: String) = client.sendPointer("click", button)
+
+    fun sendKey(name: String) = client.sendKey(name)
+
+    fun pair(host: String, port: Int, code: String) {        settings.save(host.trim(), port, code.trim())
         settings.deviceToken = null
         _paired.value = true
         client.restart()

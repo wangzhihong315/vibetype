@@ -87,7 +87,8 @@ fun App(
                 .background(com.vibetype.VibeBackground)
         ) {
             if (paired) {
-                HomeScreen(
+                RemoteScreen(
+                    vm = vm,
                     conn = conn,
                     model = model,
                     recording = recording,
@@ -96,16 +97,6 @@ fun App(
                     partial = partial,
                     last = last,
                     notice = notice,
-                    debuggable = vm.debuggable,
-                    micGranted = micGranted,
-                    formatMs = vm::formatMs,
-                    onBegin = {
-                        if (micGranted) vm.beginTalk() else onRequestMic()
-                    },
-                    onEnd = vm::endTalk,
-                    onCancel = vm::cancelTalk,
-                    onSelfTest = vm::selfTest,
-                    onRepair = vm::unpair,
                 )
             } else {
                 PairingScreen(

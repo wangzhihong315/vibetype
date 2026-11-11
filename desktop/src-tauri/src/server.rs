@@ -39,6 +39,18 @@ struct Frame {
     duration_ms: u32,
     #[serde(default)]
     lang: String,
+    // 指针事件
+    #[serde(default)]
+    action: String,
+    #[serde(default)]
+    button: String,
+    #[serde(default)]
+    dx: f32,
+    #[serde(default)]
+    dy: f32,
+    // 固定按键
+    #[serde(default)]
+    name: String,
 }
 
 /// 监听局域网，直到进程退出。端口从 47823 开始顺延。
@@ -169,6 +181,29 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
             }
             "ping" => {
                 send_line(&mut writer, json!({ "t": "pong", "ts": 0 })).await?;
+            }
+            "pointer" => {
+                #[cfg(debug_assertions)]
+                eprintln!(
+                    "pointer frame: action={} button={} dx={} dy={}",
+                    frame.action, frame.button, frame.dx, frame.dy
+                );
+                let action = frame.action.clone();
+                let button = frame.button.clone();
+                let (dx, dy) = (frame.dx, frame.dy);
+                let _ = tokio::task::spawn_blocking(move || {
+                    inject::pointer(&action, &button, dx, dy);
+                })
+                .await;
+            }
+            "key" => {
+                #[cfg(debug_assertions)]
+                eprintln!("key frame: {}", frame.name);
+                let name = frame.name.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    inject::press_key(&name);
+                })
+                .await;
             }
             _ => {}
         }

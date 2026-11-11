@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,6 +56,38 @@ class DesktopClient(private val settings: PairingStore) {
 
     private val _state = MutableStateFlow<ConnState>(ConnState.Idle)
     val state: StateFlow<ConnState> = _state.asStateFlow()
+
+    /** 指针/按键事件走单消费者，保证顺序，不阻塞 UI 线程。 */
+    private val pointerFrames = Channel<String>(Channel.UNLIMITED)
+
+    init {
+        scope.launch {
+            for (line in pointerFrames) {
+                val out = writer ?: continue
+                try {
+                    writeLine(out, line)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    fun sendPointer(action: String, button: String = "", dx: Float = 0f, dy: Float = 0f) {
+        if (_state.value !is ConnState.Connected) return
+        val line = JSONObject()
+            .put("t", "pointer")
+            .put("action", action)
+            .put("button", button)
+            .put("dx", dx)
+            .put("dy", dy)
+            .toString()
+        pointerFrames.trySend(line)
+    }
+
+    fun sendKey(name: String) {
+        if (_state.value !is ConnState.Connected) return
+        pointerFrames.trySend(JSONObject().put("t", "key").put("name", name).toString())
+    }
 
     fun start() {
         if (loopJob?.isActive == true) return
