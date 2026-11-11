@@ -448,7 +448,7 @@ export default function App() {
                   按需启动
                 </span>
                 <span className="s">
-                  {state.mcp_keys ? "6 个工具 · 含按键" : "5 个工具 · stdio"}
+                  {state.mcp_keys ? "7 个工具 · 含按键" : "6 个工具 · 胶囊优先"}
                 </span>
               </div>
             </div>
@@ -781,7 +781,7 @@ export default function App() {
                 <div>
                   <h2>工具</h2>
                   <p className="sub">
-                    {state.mcp_keys ? "6 个工具 · 含按键" : "5 个工具 · 以胶囊为中心"}
+                    {state.mcp_keys ? "7 个工具 · 含按键" : "6 个工具 · 以胶囊为中心"}
                   </p>
                 </div>
               </div>
