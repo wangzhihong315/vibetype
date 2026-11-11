@@ -1,18 +1,151 @@
 {
   "aliases": [
-    ["five type", "VibeType"],
-    ["five deck", "VibeDeck"],
-    ["faryat", "README"],
-    ["闪电胶囊", "闪念胶囊"],
-    ["触控版", "触控板"],
-    ["最后依据", "最后一句"],
-    ["三除", "删除"],
-    ["菜饭时间", "开饭时间"]
+    [
+      "five type",
+      "VibeType"
+    ],
+    [
+      "five deck",
+      "VibeDeck"
+    ],
+    [
+      "faryat",
+      "README"
+    ],
+    [
+      "闪电胶囊",
+      "闪念胶囊"
+    ],
+    [
+      "触控版",
+      "触控板"
+    ],
+    [
+      "最后依据",
+      "最后一句"
+    ],
+    [
+      "三除",
+      "删除"
+    ],
+    [
+      "菜饭时间",
+      "开饭时间"
+    ],
+    [
+      "j song",
+      "JSON"
+    ],
+    [
+      "杰森文件",
+      "JSON 文件"
+    ],
+    [
+      "杰森格式",
+      "JSON 格式"
+    ],
+    [
+      "皮松",
+      "Python"
+    ],
+    [
+      "派森",
+      "Python"
+    ],
+    [
+      "瑞艾克特",
+      "React"
+    ],
+    [
+      "泰普斯克瑞普特",
+      "TypeScript"
+    ],
+    [
+      "贾瓦",
+      "Java"
+    ],
+    [
+      "多克尔",
+      "Docker"
+    ],
+    [
+      "吉特哈勃",
+      "GitHub"
+    ],
+    [
+      "吉特哈布",
+      "GitHub"
+    ],
+    [
+      "吉特",
+      "Git"
+    ],
+    [
+      "艾皮艾",
+      "API"
+    ],
+    [
+      "艾斯迪凯",
+      "SDK"
+    ],
+    [
+      "艾姆西皮",
+      "MCP"
+    ],
+    [
+      "斯威夫特",
+      "Swift"
+    ],
+    [
+      "拉斯特",
+      "Rust"
+    ],
+    [
+      "寇特林",
+      "Kotlin"
+    ],
+    [
+      "诺德",
+      "Node"
+    ],
+    [
+      "恩辟艾姆",
+      "npm"
+    ],
+    [
+      "沃克弗洛",
+      "workflow"
+    ],
+    [
+      "普罗姆普特",
+      "prompt"
+    ],
+    [
+      "扣德克斯",
+      "Codex"
+    ],
+    [
+      "迪普希克",
+      "DeepSeek"
+    ],
+    [
+      "克劳德",
+      "Claude"
+    ]
   ],
   "context": [
-    ["跑一遍词", "跑一遍 CI"],
-    ["跑一遍一零一", "跑一遍 CI"],
-    ["跑一遍一百零一", "跑一遍 CI"]
+    [
+      "跑一遍词",
+      "跑一遍 CI"
+    ],
+    [
+      "跑一遍一零一",
+      "跑一遍 CI"
+    ],
+    [
+      "跑一遍一百零一",
+      "跑一遍 CI"
+    ]
   ],
   "latin": {
     "bran": "branch",
@@ -22,6 +155,63 @@
     "swist": "Swift",
     "readme": "README",
     "vibetype": "VibeType",
-    "vibedeck": "VibeDeck"
+    "vibedeck": "VibeDeck",
+    "api": "API",
+    "sdk": "SDK",
+    "cli": "CLI",
+    "ui": "UI",
+    "ux": "UX",
+    "git": "Git",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "docker": "Docker",
+    "python": "Python",
+    "java": "Java",
+    "javascript": "JavaScript",
+    "js": "JS",
+    "typescript": "TypeScript",
+    "react": "React",
+    "vue": "Vue",
+    "node": "Node",
+    "npm": "npm",
+    "yarn": "Yarn",
+    "sql": "SQL",
+    "mysql": "MySQL",
+    "postgresql": "PostgreSQL",
+    "redis": "Redis",
+    "http": "HTTP",
+    "https": "HTTPS",
+    "url": "URL",
+    "uri": "URI",
+    "yaml": "YAML",
+    "toml": "TOML",
+    "repo": "repo",
+    "mcp": "MCP",
+    "llm": "LLM",
+    "gpt": "GPT",
+    "openai": "OpenAI",
+    "claude": "Claude",
+    "codex": "Codex",
+    "deepseek": "DeepSeek",
+    "anthropic": "Anthropic",
+    "kotlin": "Kotlin",
+    "gradle": "Gradle",
+    "xcode": "Xcode",
+    "android": "Android",
+    "ios": "iOS",
+    "macos": "macOS",
+    "windows": "Windows",
+    "linux": "Linux",
+    "tauri": "Tauri",
+    "rust": "Rust",
+    "prompt": "prompt",
+    "workflow": "workflow",
+    "deploy": "deploy",
+    "commit": "commit",
+    "branch": "branch",
+    "merge": "merge",
+    "config": "config",
+    "token": "token",
+    "debug": "debug"
   }
 }

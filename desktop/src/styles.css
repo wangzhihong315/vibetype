@@ -1042,8 +1042,8 @@ button.cmd .link {
 }
 
 .key-label {
-  width: 76px;
-  flex: 0 0 76px;
+  width: 62px;
+  flex: 0 0 62px;
 }
 
 .key-select {
@@ -1053,12 +1053,21 @@ button.cmd .link {
 
 .mods {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   flex: 0 0 auto;
 }
 
+.key-kind {
+  width: 62px;
+}
+
+.key-select {
+  font-size: 11px;
+  padding: 0 6px;
+}
+
 .mod {
-  width: 28px;
+  width: 23px;
   height: 26px;
   border-radius: 7px;
   background: var(--fill);
@@ -1107,4 +1116,33 @@ button.cmd .link {
   font-size: 12px;
   padding: 0 8px;
   font-family: inherit;
+}
+
+/* 设置页两栏：左边开关类，右边按键编辑 */
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 滚动区域给一条常显的细滚动条，避免“以为没有滚动” */
+.main::-webkit-scrollbar {
+  width: 9px;
+}
+
+.main::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+
+.main::-webkit-scrollbar-track {
+  background: transparent;
 }

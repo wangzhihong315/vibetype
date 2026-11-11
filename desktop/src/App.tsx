@@ -896,6 +896,7 @@ export default function App() {
               <p>上屏方式、启动项与权限</p>
             </header>
 
+            <div className="settings-grid">
             <div className="card">
               <div className="row-item">
                 <div>
@@ -987,7 +988,7 @@ export default function App() {
                       }
                     >
                       <option value="key">按键</option>
-                      <option value="app">打开应用</option>
+                      <option value="app">应用</option>
                     </select>
 
                     {slot.action === "app" ? (
@@ -1048,8 +1049,9 @@ export default function App() {
               <p className="hint">
                 「切换」默认 {state.platform === "windows" ? "Alt+Tab" : "⌘Tab"}，
                 「自定义」默认 {state.platform === "windows" ? "Win+Tab" : "⌃↑"}。
-                选「打开应用」后，没开就启动、开着就切到最前；手机上显示的是标签。
+                选「应用」后，没开就启动、开着就切到最前；手机上显示的是标签。
               </p>
+            </div>
             </div>
 
             <p className="hint">

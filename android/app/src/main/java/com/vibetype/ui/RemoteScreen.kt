@@ -115,6 +115,7 @@ fun RemoteScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showCapsules by remember { mutableStateOf(false) }
     var showGestures by remember { mutableStateOf(false) }
+    var showTranscript by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
 
     val capsules by vm.capsules.collectAsState()
@@ -198,6 +199,7 @@ fun RemoteScreen(
             onDown = vm::sendPointerDown,
             onUp = vm::sendPointerUp,
             onRetry = vm::resendLast,
+            onOpenTranscript = { showTranscript = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -253,6 +255,17 @@ fun RemoteScreen(
             showGestures = false
             vm.markGesturesSeen()
         })
+    }
+    if (showTranscript && last != null) {
+        TranscriptSheet(
+            text = last!!.text,
+            corrected = last!!.corrected,
+            onDismiss = { showTranscript = false },
+            onCopy = {
+                vm.copyLast()
+                showTranscript = false
+            },
+        )
     }
     if (showCapsules) {
         CapsuleSheet(
@@ -311,6 +324,7 @@ private fun Trackpad(
     onDown: () -> Unit,
     onUp: () -> Unit,
     onRetry: () -> Unit,
+    onOpenTranscript: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current.density
@@ -364,7 +378,7 @@ private fun Trackpad(
             )
             capsuleSaving -> BusyOverlay(label = "存进胶囊…")
             busy -> BusyOverlay(label = "转写中…")
-            last != null -> ResultToast(last, onRetry = onRetry)
+            last != null -> ResultToast(last, onRetry = onRetry, onOpen = onOpenTranscript)
         }
 
         if (connected && !recording && !capsuleRecording && !busy && last == null) {
@@ -639,13 +653,19 @@ private fun RecordingOverlay(
             Text(label, fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
             if (partial.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
+                // 长句只留最新的部分，前面用省略号，免得用户以为后面没识别
+                val shown = if (partial.length > 96) {
+                    "…" + partial.takeLast(96)
+                } else {
+                    partial
+                }
                 Text(
-                    text = partial,
+                    text = shown,
                     fontSize = 14.sp,
                     lineHeight = 21.sp,
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 26.dp),
                 )
@@ -703,16 +723,21 @@ private fun BusyOverlay(label: String) {
 }
 
 @Composable
-private fun ResultToast(transcript: Transcript, onRetry: () -> Unit) {
+private fun ResultToast(
+    transcript: Transcript,
+    onRetry: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    val long = transcript.text.length > 40
     Row(
         Modifier
             .fillMaxWidth()
             .padding(10.dp)
             .then(
-                if (transcript.ack == AckState.Failed) {
-                    Modifier.clickable(onClick = onRetry)
-                } else {
-                    Modifier
+                when {
+                    transcript.ack == AckState.Failed -> Modifier.clickable(onClick = onRetry)
+                    long -> Modifier.clickable(onClick = onOpen)
+                    else -> Modifier
                 }
             )
             .clip(RoundedCornerShape(14.dp))
@@ -758,6 +783,12 @@ private fun ResultToast(transcript: Transcript, onRetry: () -> Unit) {
             )
             if (transcript.ack == AckState.Failed) {
                 Text("点一下重发", fontSize = 10.sp, color = VibeCoral)
+            } else if (long) {
+                Text(
+                    "共 ${transcript.text.length} 字 · 点开看全文",
+                    fontSize = 10.sp,
+                    color = VibeBlue,
+                )
             }
         }
     }
@@ -1290,6 +1321,80 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranscriptSheet(
+    text: String,
+    corrected: Int,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        contentColor = VibeInk,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 18.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("这次说的话", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+                Spacer(Modifier.weight(1f))
+                Text("${text.length} 字", fontSize = 12.sp, color = VibeFaint)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = text,
+                fontSize = 16.sp,
+                lineHeight = 26.sp,
+                color = VibeInk,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFF5F5F7))
+                    .padding(16.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (corrected > 0) "已更正 $corrected 处术语" else "全部内容都在这儿，没有丢字",
+                fontSize = 11.sp,
+                color = VibeFaint,
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFF5F5F7))
+                        .clickable(onClick = onCopy),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("复制全文", fontSize = 14.sp, color = VibeInk)
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(VibeBlue)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("知道了", fontSize = 14.sp, color = Color.White)
+                }
+            }
         }
     }
 }
