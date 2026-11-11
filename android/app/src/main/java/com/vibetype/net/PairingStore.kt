@@ -46,6 +46,11 @@ class PairingStore(context: Context) {
         get() = prefs.getFloat("pointerSpeed", 1f)
         set(value) = prefs.edit().putFloat("pointerSpeed", value).apply()
 
+    /** 边缘滑动速度：右缘/左缘上下滑，单独一个档，默认比指针慢一些。 */
+    var edgeScrollSpeed: Float
+        get() = prefs.getFloat("edgeScrollSpeed", 0.6f)
+        set(value) = prefs.edit().putFloat("edgeScrollSpeed", value).apply()
+
     /** 自然滚动：手指上滑内容跟着上走。 */
     var naturalScroll: Boolean
         get() = prefs.getBoolean("naturalScroll", true)

@@ -133,6 +133,7 @@ fun RemoteScreen(
     val leftHanded by vm.leftHanded.collectAsState()
     val pointerSpeed by vm.pointerSpeed.collectAsState()
     val naturalScroll by vm.naturalScroll.collectAsState()
+    val edgeScrollSpeed by vm.edgeScrollSpeed.collectAsState()
     val keymap by vm.keymap.collectAsState()
     val pendingCapsules = capsules.count { !it.synced }
 
@@ -201,6 +202,7 @@ fun RemoteScreen(
             leftHanded = leftHanded,
             pointerSpeed = pointerSpeed,
             naturalScroll = naturalScroll,
+            edgeScrollSpeed = edgeScrollSpeed,
             onFlightDone = { flying = null },
             onMove = vm::sendMove,
             onScroll = vm::sendScroll,
@@ -242,6 +244,7 @@ fun RemoteScreen(
             leftHanded = leftHanded,
             pointerSpeed = pointerSpeed,
             naturalScroll = naturalScroll,
+            edgeScrollSpeed = edgeScrollSpeed,
             debuggable = vm.debuggable,
             onDismiss = { showSettings = false },
             onSelfTest = {
@@ -250,6 +253,7 @@ fun RemoteScreen(
             },
             onToggleLeftHanded = vm::setLeftHanded,
             onSpeedChange = vm::setPointerSpeed,
+            onEdgeSpeedChange = vm::setEdgeScrollSpeed,
             onToggleNatural = vm::setNaturalScroll,
             onShowGestures = {
                 showSettings = false
@@ -328,6 +332,7 @@ private fun Trackpad(
     leftHanded: Boolean,
     pointerSpeed: Float,
     naturalScroll: Boolean,
+    edgeScrollSpeed: Float,
     onFlightDone: () -> Unit,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
@@ -349,10 +354,10 @@ private fun Trackpad(
             .background(Brush.verticalGradient(listOf(PadTop, PadBottom)))
             .then(
                 if (connected) {
-                    Modifier.pointerInput(leftHanded, pointerSpeed, naturalScroll) {
+                    Modifier.pointerInput(leftHanded, pointerSpeed, naturalScroll, edgeScrollSpeed) {
                         trackpadGestures(
                             density, edgePx, slop, leftHanded,
-                            pointerSpeed, naturalScroll,
+                            pointerSpeed, naturalScroll, edgeScrollSpeed,
                             onMove, onScroll, onClick, onDown, onUp, onZoom,
                         )
                     }
@@ -490,6 +495,7 @@ private suspend fun PointerInputScope.trackpadGestures(
     leftHanded: Boolean,
     speed: Float,
     natural: Boolean,
+    edgeSpeed: Float,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onClick: (String) -> Unit,
@@ -573,7 +579,7 @@ private suspend fun PointerInputScope.trackpadGestures(
                     )
                 } else if (total.getDistance() > slop) {
                     if (edge) {
-                        onScroll(0f, -delta.y / density * 1.2f * speed * scrollSign)
+                        onScroll(0f, -delta.y / density * 1.2f * edgeSpeed * scrollSign)
                     } else {
                         onMove(
                         delta.x / density * 1.35f * speed,
@@ -1185,10 +1191,12 @@ private fun SettingsSheet(
     leftHanded: Boolean,
     pointerSpeed: Float,
     naturalScroll: Boolean,
+    edgeScrollSpeed: Float,
     debuggable: Boolean,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
     onSpeedChange: (Float) -> Unit,
+    onEdgeSpeedChange: (Float) -> Unit,
     onToggleNatural: (Boolean) -> Unit,
     onShowGestures: () -> Unit,
     onSelfTest: () -> Unit,
@@ -1261,6 +1269,29 @@ private fun SettingsSheet(
                         onValueChange = onSpeedChange,
                         valueRange = 0.6f..2f,
                         steps = 6,
+                        colors = SliderDefaults.colors(
+                            thumbColor = VibeBlue,
+                            activeTrackColor = VibeBlue,
+                        ),
+                    )
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("慢", fontSize = 10.sp, color = VibeFaint)
+                        Spacer(Modifier.weight(1f))
+                        Text("快", fontSize = 10.sp, color = VibeFaint)
+                    }
+                }
+
+                Column(Modifier.padding(bottom = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("边缘滚动", fontSize = 14.sp, color = VibeInk)
+                        Spacer(Modifier.weight(1f))
+                        Text(edgeSpeedLabel(edgeScrollSpeed), fontSize = 12.sp, color = VibeMuted)
+                    }
+                    Slider(
+                        value = edgeScrollSpeed,
+                        onValueChange = onEdgeSpeedChange,
+                        valueRange = 0.3f..1.5f,
+                        steps = 5,
                         colors = SliderDefaults.colors(
                             thumbColor = VibeBlue,
                             activeTrackColor = VibeBlue,
@@ -1998,6 +2029,14 @@ private fun capsuleMeta(capsule: Capsule): String {
     val seconds = capsule.durationMs / 1000
     val duration = "%d:%02d".format(seconds / 60, seconds % 60)
     return if (capsule.synced) "$duration · 已同步到电脑" else "$duration · 只在手机"
+}
+
+private fun edgeSpeedLabel(value: Float): String = when {
+    value < 0.45f -> "很慢"
+    value < 0.75f -> "慢"
+    value < 1.05f -> "标准"
+    value < 1.3f -> "快"
+    else -> "很快"
 }
 
 private fun speedLabel(value: Float): String = when {

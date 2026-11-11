@@ -99,6 +99,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _naturalScroll = MutableStateFlow(settings.naturalScroll)
     val naturalScroll: StateFlow<Boolean> = _naturalScroll.asStateFlow()
 
+    private val _edgeScrollSpeed = MutableStateFlow(settings.edgeScrollSpeed)
+    val edgeScrollSpeed: StateFlow<Float> = _edgeScrollSpeed.asStateFlow()
+
     private var asr: XAsr? = null
 
     /** debug 包才显示「自检」入口。 */
@@ -461,6 +464,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val clamped = value.coerceIn(0.6f, 2f)
         settings.pointerSpeed = clamped
         _pointerSpeed.value = clamped
+    }
+
+    fun setEdgeScrollSpeed(value: Float) {
+        val clamped = value.coerceIn(0.3f, 1.5f)
+        settings.edgeScrollSpeed = clamped
+        _edgeScrollSpeed.value = clamped
     }
 
     fun setNaturalScroll(value: Boolean) {
