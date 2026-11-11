@@ -31,6 +31,16 @@ class PairingStore(context: Context) {
         get() = prefs.getString("desktopName", null)
         set(value) = prefs.edit().putString("desktopName", value).apply()
 
+    /** 左手模式：触控板右缘滚动条和按键区一起镜像。 */
+    var leftHanded: Boolean
+        get() = prefs.getBoolean("leftHanded", false)
+        set(value) = prefs.edit().putBoolean("leftHanded", value).apply()
+
+    /** 手势说明第一次自动弹，之后从设置里进。 */
+    var seenGestures: Boolean
+        get() = prefs.getBoolean("seenGestures", false)
+        set(value) = prefs.edit().putBoolean("seenGestures", value).apply()
+
     val paired: Boolean
         get() = !host.isNullOrBlank() && !token.isNullOrBlank()
 

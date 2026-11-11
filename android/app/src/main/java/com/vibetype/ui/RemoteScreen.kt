@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -108,12 +111,22 @@ fun RemoteScreen(
     val ready = model is ModelState.Ready
     var showSettings by remember { mutableStateOf(false) }
     var showCapsules by remember { mutableStateOf(false) }
+    var showGestures by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
 
     val capsules by vm.capsules.collectAsState()
     val capsuleRecording by vm.capsuleRecording.collectAsState()
     val capsulePartial by vm.capsulePartial.collectAsState()
     val capsuleSaving by vm.capsuleSaving.collectAsState()
+    val leftHanded by vm.leftHanded.collectAsState()
+
+    // 第一次连上之后自动弹一次手势说明
+    LaunchedEffect(Unit) {
+        if (!vm.gesturesSeen()) {
+            delay(900)
+            showGestures = true
+        }
+    }
 
     var flying by remember { mutableStateOf<Capsule?>(null) }
     LaunchedEffect(Unit) {
@@ -161,10 +174,13 @@ fun RemoteScreen(
             seconds = seconds,
             notice = notice,
             flying = flying,
+            leftHanded = leftHanded,
             onFlightDone = { flying = null },
             onMove = vm::sendMove,
             onScroll = vm::sendScroll,
             onClick = vm::sendClick,
+            onDown = vm::sendPointerDown,
+            onUp = vm::sendPointerUp,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -176,6 +192,7 @@ fun RemoteScreen(
             capsuleEnabled = ready && !busy && !recording,
             recording = recording,
             capsuleRecording = capsuleRecording,
+            leftHanded = leftHanded,
             onVoiceStart = vm::beginTalk,
             onVoiceEnd = vm::endTalk,
             onVoiceCancel = vm::cancelTalk,
@@ -191,12 +208,24 @@ fun RemoteScreen(
     if (showSettings) {
         SettingsSheet(
             conn = conn,
+            leftHanded = leftHanded,
             onDismiss = { showSettings = false },
+            onToggleLeftHanded = vm::setLeftHanded,
+            onShowGestures = {
+                showSettings = false
+                showGestures = true
+            },
             onUnpair = {
                 showSettings = false
                 vm.unpair()
             },
         )
+    }
+    if (showGestures) {
+        GestureSheet(onDismiss = {
+            showGestures = false
+            vm.markGesturesSeen()
+        })
     }
     if (showCapsules) {
         CapsuleSheet(
@@ -245,10 +274,13 @@ private fun Trackpad(
     seconds: Int,
     notice: String?,
     flying: Capsule?,
+    leftHanded: Boolean,
     onFlightDone: () -> Unit,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onClick: (String) -> Unit,
+    onDown: () -> Unit,
+    onUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current.density
@@ -261,19 +293,22 @@ private fun Trackpad(
             .background(Brush.verticalGradient(listOf(PadTop, PadBottom)))
             .then(
                 if (connected) {
-                    Modifier.pointerInput(Unit) {
-                        trackpadGestures(density, edgePx, slop, onMove, onScroll, onClick)
+                    Modifier.pointerInput(leftHanded) {
+                        trackpadGestures(
+                            density, edgePx, slop, leftHanded,
+                            onMove, onScroll, onClick, onDown, onUp,
+                        )
                     }
                 } else {
                     Modifier
                 }
             )
     ) {
-        // 右缘滚动条：常驻淡显，让用户摸得到
+        // 滚动条贴着惯用手那一侧，常驻淡显，让用户摸得到
         Box(
             Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 7.dp)
+                .align(if (leftHanded) Alignment.CenterStart else Alignment.CenterEnd)
+                .padding(start = if (leftHanded) 7.dp else 0.dp, end = if (leftHanded) 0.dp else 7.dp)
                 .width(3.dp)
                 .height(150.dp)
                 .clip(RoundedCornerShape(2.dp))
@@ -303,7 +338,7 @@ private fun Trackpad(
 
         if (connected && !recording && !capsuleRecording && !busy && last == null) {
             Text(
-                text = "轻点左键 · 双指滚动 · 右缘滚动",
+                text = if (leftHanded) "轻点左键 · 双指滚动 · 左缘滚动" else "轻点左键 · 双指滚动 · 右缘滚动",
                 fontSize = 11.sp,
                 color = Color.White.copy(alpha = 0.28f),
                 modifier = Modifier
@@ -395,19 +430,27 @@ private suspend fun PointerInputScope.trackpadGestures(
     density: Float,
     edgePx: Float,
     slop: Float,
+    leftHanded: Boolean,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onClick: (String) -> Unit,
+    onDown: () -> Unit,
+    onUp: () -> Unit,
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val started = System.currentTimeMillis()
-        val edge = down.position.x > size.width - edgePx
+        val edge = if (leftHanded) {
+            down.position.x < edgePx
+        } else {
+            down.position.x > size.width - edgePx
+        }
         var last = down.position
         var total = Offset.Zero
         var maxPointers = 1
         var lastTwo: Offset? = null
         var twoFingerMoved = false
+        var dragging = false
 
         while (true) {
             val event = awaitPointerEvent()
@@ -431,7 +474,19 @@ private suspend fun PointerInputScope.trackpadGestures(
                 val delta = centroid - last
                 total += delta
                 last = centroid
-                if (total.getDistance() > slop) {
+
+                // 停住不动 350ms 就当作长按：按下左键，后面的移动变成拖拽
+                val held = System.currentTimeMillis() - started
+                if (!dragging && !edge && maxPointers == 1 && held > 350 &&
+                    total.getDistance() < slop
+                ) {
+                    dragging = true
+                    onDown()
+                }
+
+                if (dragging) {
+                    onMove(delta.x / density * 1.35f, delta.y / density * 1.35f)
+                } else if (total.getDistance() > slop) {
                     if (edge) {
                         onScroll(0f, -delta.y / density * 1.2f)
                     } else {
@@ -440,6 +495,11 @@ private suspend fun PointerInputScope.trackpadGestures(
                 }
             }
             event.changes.forEach { it.consume() }
+        }
+
+        if (dragging) {
+            onUp()
+            return@awaitEachGesture
         }
 
         val duration = System.currentTimeMillis() - started
@@ -657,6 +717,7 @@ private fun Dock(
     capsuleEnabled: Boolean,
     recording: Boolean,
     capsuleRecording: Boolean,
+    leftHanded: Boolean,
     onVoiceStart: () -> Unit,
     onVoiceEnd: () -> Unit,
     onVoiceCancel: () -> Unit,
@@ -671,36 +732,86 @@ private fun Dock(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        VoiceKey(
-            enabled = enabled && !capsuleRecording,
-            recording = recording,
-            onStart = onVoiceStart,
-            onEnd = onVoiceEnd,
-            onCancel = onVoiceCancel,
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(
-            Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CapsuleKey(
-                    enabled = capsuleEnabled && !recording,
-                    recording = capsuleRecording,
-                    onTap = onCapsuleTap,
-                    onStart = onCapsuleStart,
-                    onEnd = onCapsuleEnd,
-                    onCancel = onCapsuleCancel,
-                    modifier = Modifier.weight(1f),
-                )
-                KeyButton("回车", enabled, Modifier.weight(1f)) { if (enabled) onKey("enter") }
-                KeyButton("删除", enabled, Modifier.weight(1f)) { if (enabled) onKey("delete") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KeyButton("esc", enabled, Modifier.weight(1f)) { if (enabled) onKey("esc") }
-                KeyButton("切换", enabled, Modifier.weight(1f)) { if (enabled) onKey("switch") }
-                KeyButton("自定义", enabled, Modifier.weight(1f)) { if (enabled) onKey("custom") }
-            }
+        if (leftHanded) {
+            DockKeys(
+                enabled = enabled,
+                capsuleEnabled = capsuleEnabled,
+                recording = recording,
+                capsuleRecording = capsuleRecording,
+                onKey = onKey,
+                onCapsuleTap = onCapsuleTap,
+                onCapsuleStart = onCapsuleStart,
+                onCapsuleEnd = onCapsuleEnd,
+                onCapsuleCancel = onCapsuleCancel,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(14.dp))
+            VoiceKey(
+                enabled = enabled && !capsuleRecording,
+                recording = recording,
+                onStart = onVoiceStart,
+                onEnd = onVoiceEnd,
+                onCancel = onVoiceCancel,
+            )
+        } else {
+            VoiceKey(
+                enabled = enabled && !capsuleRecording,
+                recording = recording,
+                onStart = onVoiceStart,
+                onEnd = onVoiceEnd,
+                onCancel = onVoiceCancel,
+            )
+            Spacer(Modifier.width(14.dp))
+            DockKeys(
+                enabled = enabled,
+                capsuleEnabled = capsuleEnabled,
+                recording = recording,
+                capsuleRecording = capsuleRecording,
+                onKey = onKey,
+                onCapsuleTap = onCapsuleTap,
+                onCapsuleStart = onCapsuleStart,
+                onCapsuleEnd = onCapsuleEnd,
+                onCapsuleCancel = onCapsuleCancel,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DockKeys(
+    enabled: Boolean,
+    capsuleEnabled: Boolean,
+    recording: Boolean,
+    capsuleRecording: Boolean,
+    onKey: (String) -> Unit,
+    onCapsuleTap: () -> Unit,
+    onCapsuleStart: () -> Unit,
+    onCapsuleEnd: () -> Unit,
+    onCapsuleCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CapsuleKey(
+                enabled = capsuleEnabled && !recording,
+                recording = capsuleRecording,
+                onTap = onCapsuleTap,
+                onStart = onCapsuleStart,
+                onEnd = onCapsuleEnd,
+                onCancel = onCapsuleCancel,
+                modifier = Modifier.weight(1f),
+            )
+            KeyButton("回车", enabled, Modifier.weight(1f)) { if (enabled) onKey("enter") }
+            KeyButton("删除", enabled, Modifier.weight(1f)) { if (enabled) onKey("delete") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KeyButton("esc", enabled, Modifier.weight(1f)) { if (enabled) onKey("esc") }
+            KeyButton("切换", enabled, Modifier.weight(1f)) { if (enabled) onKey("switch") }
+            KeyButton("自定义", enabled, Modifier.weight(1f)) { if (enabled) onKey("custom") }
         }
     }
 }
@@ -866,9 +977,18 @@ private fun KeyButton(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsSheet(conn: ConnState, onDismiss: () -> Unit, onUnpair: () -> Unit) {
+private fun SettingsSheet(
+    conn: ConnState,
+    leftHanded: Boolean,
+    onDismiss: () -> Unit,
+    onToggleLeftHanded: (Boolean) -> Unit,
+    onShowGestures: () -> Unit,
+    onUnpair: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = Color.White,
         contentColor = VibeInk,
     ) {
@@ -879,27 +999,168 @@ private fun SettingsSheet(conn: ConnState, onDismiss: () -> Unit, onUnpair: () -
                 .navigationBarsPadding()
                 .padding(bottom = 18.dp),
         ) {
-            Text("设置", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth()) {
-                Text("当前电脑", fontSize = 13.sp, color = VibeMuted)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    when (conn) {
+            Text("设置", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            Spacer(Modifier.height(18.dp))
+
+            SettingsGroup("电脑") {
+                SettingsRow(
+                    title = "当前电脑",
+                    value = when (conn) {
                         is ConnState.Connected ->
                             if (conn.platform == "macos") "Mac" else "Windows"
                         else -> "未连接"
                     },
-                    fontSize = 13.sp,
-                    color = VibeFaint,
+                )
+                SettingsRow(
+                    title = "换电脑 / 解除配对",
+                    value = "",
+                    danger = true,
+                    onClick = onUnpair,
                 )
             }
-            Spacer(Modifier.height(14.dp))
-            TextButton(onClick = onUnpair, modifier = Modifier.fillMaxWidth()) {
-                Text("换电脑 / 解除配对", fontSize = 13.sp, color = VibeCoral)
+
+            Spacer(Modifier.height(16.dp))
+            SettingsGroup("遥控器") {
+                SettingsRow(title = "手势说明", value = "", onClick = onShowGestures)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("左手模式", fontSize = 14.sp, color = VibeInk)
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = leftHanded,
+                        onCheckedChange = onToggleLeftHanded,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = VibeGreen,
+                        ),
+                    )
+                }
             }
-            Spacer(Modifier.height(4.dp))
+
+            Spacer(Modifier.height(16.dp))
+            SettingsGroup("胶囊") {
+                SettingsRow(title = "保存位置", value = "这台手机")
+                SettingsRow(title = "转写", value = "手机本地")
+            }
+
+            Spacer(Modifier.height(22.dp))
             Text("VibeType 0.1.0 · X-ASR", fontSize = 11.sp, color = VibeFaint)
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroup(label: String, content: @Composable ColumnScope.() -> Unit) {
+    Text(label, fontSize = 11.sp, color = VibeFaint)
+    Spacer(Modifier.height(6.dp))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFF5F5F7))
+            .padding(horizontal = 16.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    value: String,
+    danger: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, fontSize = 14.sp, color = if (danger) VibeCoral else VibeInk)
+        Spacer(Modifier.weight(1f))
+        if (value.isNotEmpty()) {
+            Text(value, fontSize = 13.sp, color = VibeFaint)
+        }
+        if (onClick != null && !danger) {
+            Spacer(Modifier.width(6.dp))
+            Text("›", fontSize = 16.sp, color = VibeFaint)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GestureSheet(onDismiss: () -> Unit) {
+    val rows = listOf(
+        "单指移动" to "移动鼠标",
+        "轻点" to "左键",
+        "双指滑动" to "滚动页面",
+        "双指轻点" to "右键",
+        "停住再拖" to "按住左键拖拽",
+        "边缘滑动" to "滚动，不碰鼠标位置",
+        "按住胶囊键" to "存一条闪念",
+    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        contentColor = VibeInk,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 18.dp),
+        ) {
+            Text("触控板手势", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            Spacer(Modifier.height(14.dp))
+            rows.forEach { (gesture, meaning) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        gesture,
+                        fontSize = 13.sp,
+                        color = VibeInk,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF2F3F5))
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(meaning, fontSize = 13.sp, color = VibeMuted)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(VibeBlue)
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("知道了", fontSize = 14.sp, color = Color.White)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "之后可以从「设置 → 手势说明」再打开。",
+                fontSize = 11.sp,
+                color = VibeFaint,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

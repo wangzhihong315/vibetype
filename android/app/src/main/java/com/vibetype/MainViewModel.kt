@@ -89,6 +89,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _paired = MutableStateFlow(settings.paired)
     val paired: StateFlow<Boolean> = _paired.asStateFlow()
 
+    private val _leftHanded = MutableStateFlow(settings.leftHanded)
+    val leftHanded: StateFlow<Boolean> = _leftHanded.asStateFlow()
+
     private var asr: XAsr? = null
 
     /** debug 包才显示「自检」入口。 */
@@ -409,7 +412,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sendClick(button: String) = client.sendPointer("click", button)
 
+    /** 长按拖动：先按住左键，移动照旧走 move，松手再抬起。 */
+    fun sendPointerDown() = client.sendPointer("down", "left")
+
+    fun sendPointerUp() = client.sendPointer("up", "left")
+
     fun sendKey(name: String) = client.sendKey(name)
+
+    fun setLeftHanded(value: Boolean) {
+        settings.leftHanded = value
+        _leftHanded.value = value
+    }
+
+    fun gesturesSeen(): Boolean = settings.seenGestures
+
+    fun markGesturesSeen() {
+        settings.seenGestures = true
+    }
 
     fun pair(host: String, port: Int, code: String) {        settings.save(host.trim(), port, code.trim())
         settings.deviceToken = null
