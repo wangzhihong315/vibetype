@@ -127,6 +127,10 @@ class DesktopClient(private val settings: PairingStore) {
             } catch (e: PairingRequired) {
                 _state.value = ConnState.NeedsPairing(e.message ?: "需要重新配对")
                 return
+            } catch (e: ServerClosed) {
+                // 桌面端正常收起连接（空闲超时/重启），静默重连，不报错
+                _state.value = ConnState.Connecting
+                delay(300)
             } catch (e: Exception) {
                 _state.value = ConnState.Failed(humanize(e))
                 delay(backoff)
@@ -137,6 +141,7 @@ class DesktopClient(private val settings: PairingStore) {
 
     private fun serve(host: String, port: Int, token: String) {
         val s = Socket()
+        var heartbeat: Job? = null
         try {
             s.connect(InetSocketAddress(host, port), 4_000)
             s.tcpNoDelay = true
@@ -160,12 +165,25 @@ class DesktopClient(private val settings: PairingStore) {
                     .toString()
             )
 
+            // 桌面端 60 秒没收到任何东西会断；20 秒一个 ping 保持长连接
+            heartbeat = scope.launch {
+                while (isActive) {
+                    delay(20_000)
+                    try {
+                        writeLine(out, JSONObject().put("t", "ping").toString())
+                    } catch (_: Exception) {
+                        break
+                    }
+                }
+            }
+
             val input = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
             while (true) {
-                val line = input.readLine() ?: throw IOException("桌面端断开了连接")
+                val line = input.readLine() ?: throw ServerClosed()
                 handle(line)
             }
         } finally {
+            heartbeat?.cancel()
             closeSocket()
         }
     }
@@ -238,6 +256,9 @@ class DesktopClient(private val settings: PairingStore) {
     }
 
     private class PairingRequired(message: String) : Exception(message)
+
+    /** 桌面端主动关连接，属于正常情况。 */
+    private class ServerClosed : Exception("桌面端断开了连接")
 
     companion object {
         private const val TAG = "DesktopClient"

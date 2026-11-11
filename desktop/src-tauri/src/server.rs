@@ -11,7 +11,7 @@ use crate::inject;
 use crate::state::{AppState, Entry, TokenKind};
 
 const PROTOCOL_VERSION: u32 = 1;
-const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+const IDLE_TIMEOUT: Duration = Duration::from_secs(180);
 
 #[derive(Deserialize, Default)]
 struct DeviceInfo {
