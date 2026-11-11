@@ -1,5 +1,7 @@
 # 协议 v1
 
+[English](en/protocol.md) · 中文
+
 桌面端监听 TCP（默认 `47823`，被占用时顺延），手机主动连接。报文为 **NDJSON**：一行一个 JSON，UTF-8，单行不超过 64 KB。
 
 ## 配对

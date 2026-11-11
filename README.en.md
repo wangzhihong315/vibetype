@@ -40,7 +40,8 @@ vibetype/
 ├── desktop/           Desktop (Tauri 2: Rust core + React UI)
 ├── docs/
 │   ├── architecture.md
-│   └── protocol.md
+│   ├── protocol.md
+│   └── en/            English translations
 └── .github/workflows/ macOS / Windows installers
 ```
 
@@ -141,7 +142,7 @@ on `windows-latest` and uploads it as an artifact alongside macOS.
 ## License
 
 Code is MIT. The default X-ASR model is Apache-2.0; the optional SenseVoice weights follow the FunASR
-Model License v1.1 (commercial use allowed with attribution). See [docs/architecture.md](docs/architecture.md).
+Model License v1.1 (commercial use allowed with attribution). See [docs/en/architecture.md](docs/en/architecture.md).
 
 ---
 
