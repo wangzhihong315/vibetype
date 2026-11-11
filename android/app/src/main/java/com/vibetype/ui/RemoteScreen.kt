@@ -1,5 +1,8 @@
 package com.vibetype.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,40 +11,57 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,8 +78,14 @@ import com.vibetype.VibeFaint
 import com.vibetype.VibeGreen
 import com.vibetype.VibeInk
 import com.vibetype.VibeMuted
+import com.vibetype.capsule.Capsule
 import com.vibetype.net.ConnState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 private val PadTop = Color(0xFF1D1E24)
@@ -84,9 +110,20 @@ fun RemoteScreen(
     var showCapsules by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(recording) {
+    val capsules by vm.capsules.collectAsState()
+    val capsuleRecording by vm.capsuleRecording.collectAsState()
+    val capsulePartial by vm.capsulePartial.collectAsState()
+    val capsuleSaving by vm.capsuleSaving.collectAsState()
+
+    var flying by remember { mutableStateOf<Capsule?>(null) }
+    LaunchedEffect(Unit) {
+        vm.capsuleSaved.collect { flying = it }
+    }
+
+    val recordingNow = recording || capsuleRecording
+    LaunchedEffect(recordingNow) {
         seconds = 0
-        while (recording) {
+        while (recordingNow) {
             delay(1_000)
             seconds += 1
         }
@@ -115,12 +152,16 @@ fun RemoteScreen(
         Trackpad(
             connected = connected,
             recording = recording,
+            capsuleRecording = capsuleRecording,
+            capsuleSaving = capsuleSaving,
             busy = busy,
             level = level,
-            partial = partial,
+            partial = if (capsuleRecording) capsulePartial else partial,
             last = last,
             seconds = seconds,
             notice = notice,
+            flying = flying,
+            onFlightDone = { flying = null },
             onMove = vm::sendMove,
             onScroll = vm::sendScroll,
             onClick = vm::sendClick,
@@ -132,12 +173,17 @@ fun RemoteScreen(
 
         Dock(
             enabled = connected && ready && !busy,
+            capsuleEnabled = ready && !busy && !recording,
             recording = recording,
+            capsuleRecording = capsuleRecording,
             onVoiceStart = vm::beginTalk,
             onVoiceEnd = vm::endTalk,
             onVoiceCancel = vm::cancelTalk,
             onKey = vm::sendKey,
-            onCapsule = { showCapsules = true },
+            onCapsuleTap = { showCapsules = true },
+            onCapsuleStart = vm::beginCapsule,
+            onCapsuleEnd = vm::endCapsule,
+            onCapsuleCancel = vm::cancelCapsule,
             modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
         )
     }
@@ -153,7 +199,14 @@ fun RemoteScreen(
         )
     }
     if (showCapsules) {
-        CapsuleSheet(onDismiss = { showCapsules = false })
+        CapsuleSheet(
+            items = capsules,
+            onDismiss = { showCapsules = false },
+            onCopy = vm::copyCapsule,
+            onSend = vm::sendCapsuleToDesktop,
+            onDelete = vm::deleteCapsule,
+            onRename = vm::renameCapsule,
+        )
     }
 }
 
@@ -183,12 +236,16 @@ private fun ConnectionPill(conn: ConnState) {
 private fun Trackpad(
     connected: Boolean,
     recording: Boolean,
+    capsuleRecording: Boolean,
+    capsuleSaving: Boolean,
     busy: Boolean,
     level: Float,
     partial: String,
     last: Transcript?,
     seconds: Int,
     notice: String?,
+    flying: Capsule?,
+    onFlightDone: () -> Unit,
     onMove: (Float, Float) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onClick: (String) -> Unit,
@@ -224,13 +281,27 @@ private fun Trackpad(
         )
 
         when {
-            !connected -> DisconnectedOverlay()
-            recording -> RecordingOverlay(level, seconds, partial)
-            busy -> BusyOverlay()
+            !connected && !capsuleRecording -> DisconnectedOverlay()
+            capsuleRecording -> RecordingOverlay(
+                level = level,
+                seconds = seconds,
+                partial = partial,
+                label = "松开保存，自动写进胶囊",
+                capsule = true,
+            )
+            recording -> RecordingOverlay(
+                level = level,
+                seconds = seconds,
+                partial = partial,
+                label = "松开结束，文字会打进电脑光标",
+                capsule = false,
+            )
+            capsuleSaving -> BusyOverlay(label = "存进胶囊…")
+            busy -> BusyOverlay(label = "转写中…")
             last != null -> ResultToast(last)
         }
 
-        if (connected && !recording && !busy) {
+        if (connected && !recording && !capsuleRecording && !busy && last == null) {
             Text(
                 text = "轻点左键 · 双指滚动 · 右缘滚动",
                 fontSize = 11.sp,
@@ -249,6 +320,72 @@ private fun Trackpad(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 42.dp),
+            )
+        }
+
+        if (flying != null) {
+            CapsuleFlight(capsule = flying, onDone = onFlightDone)
+        }
+    }
+}
+
+/**
+ * 存下胶囊时的那一下：白色卡片从中间缩着飞向左下的胶囊键。
+ * 只是视觉确认，飞完就消失，不留状态。
+ */
+@Composable
+private fun BoxScope.CapsuleFlight(capsule: Capsule, onDone: () -> Unit) {
+    val progress = remember(capsule.id) { Animatable(0f) }
+    LaunchedEffect(capsule.id) {
+        progress.animateTo(1f, tween(durationMillis = 680, easing = FastOutSlowInEasing))
+        delay(60)
+        onDone()
+    }
+
+    Box(
+        Modifier
+            .align(Alignment.Center)
+            .widthIn(max = 280.dp)
+            .graphicsLayer {
+                val p = progress.value
+                translationX = -size.width * 0.55f * p
+                translationY = size.height * 2.4f * p
+                val scale = 1f - 0.62f * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - p * p
+            }
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+    ) {
+        Column(horizontalAlignment = Alignment.Start) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(VibeCoral.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(VibeCoral)
+                    )
+                }
+                Spacer(Modifier.width(7.dp))
+                Text("已存进胶囊", fontSize = 11.sp, color = VibeCoral)
+            }
+            Spacer(Modifier.height(7.dp))
+            Text(
+                text = capsule.text,
+                fontSize = 14.sp,
+                lineHeight = 21.sp,
+                color = VibeInk,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -340,7 +477,13 @@ private fun DisconnectedOverlay() {
 }
 
 @Composable
-private fun RecordingOverlay(level: Float, seconds: Int, partial: String) {
+private fun RecordingOverlay(
+    level: Float,
+    seconds: Int,
+    partial: String,
+    label: String,
+    capsule: Boolean,
+) {
     Box(
         Modifier
             .fillMaxSize()
@@ -351,27 +494,39 @@ private fun RecordingOverlay(level: Float, seconds: Int, partial: String) {
             Canvas(Modifier.size(210.dp)) {
                 val center = Offset(size.width / 2f, size.height / 2f)
                 val base = size.minDimension / 2f
-                for (i in 0..2) {
-                    drawCircle(
-                        color = VibeCoral.copy(alpha = (0.10f - i * 0.025f) * (0.5f + level)),
-                        radius = base * (0.55f + 0.11f * i + level * 0.06f),
-                        center = center,
-                    )
-                }
-                drawCircle(color = VibeCoral, radius = base * 0.42f, center = center)
-                val barWidth = size.width * 0.024f
-                val gap = size.width * 0.022f
-                val heights = floatArrayOf(0.16f, 0.28f, 0.38f, 0.25f, 0.14f)
-                var x = center.x - (barWidth * 5 + gap * 4) / 2f
-                heights.forEach { height ->
-                    val half = size.height * height * (0.7f + level * 0.45f)
+                if (capsule) {
+                    // 胶囊是一条竖着的药丸，和圆形语音键区分开
+                    val pillWidth = size.width * 0.40f
+                    val pillHeight = size.height * 0.72f
+                    for (i in 0..2) {
+                        val grow = 1f + 0.10f * i + level * 0.05f
+                        val w = pillWidth * grow
+                        val h = pillHeight * grow
+                        val radius = CornerRadius(h / 2f, h / 2f)
+                        drawRoundRect(
+                            color = VibeCoral.copy(alpha = (0.12f - i * 0.03f) * (0.5f + level)),
+                            topLeft = Offset(center.x - w / 2f, center.y - h / 2f),
+                            size = androidx.compose.ui.geometry.Size(w, h),
+                            cornerRadius = radius,
+                        )
+                    }
                     drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(x, center.y - half),
-                        size = androidx.compose.ui.geometry.Size(barWidth, half * 2),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2, barWidth / 2),
+                        color = VibeCoral,
+                        topLeft = Offset(center.x - pillWidth / 2f, center.y - pillHeight / 2f),
+                        size = androidx.compose.ui.geometry.Size(pillWidth, pillHeight),
+                        cornerRadius = CornerRadius(pillHeight / 2f, pillHeight / 2f),
                     )
-                    x += barWidth + gap
+                    drawBars(center, level, barHeight = size.height * 0.34f)
+                } else {
+                    for (i in 0..2) {
+                        drawCircle(
+                            color = VibeCoral.copy(alpha = (0.10f - i * 0.025f) * (0.5f + level)),
+                            radius = base * (0.55f + 0.11f * i + level * 0.06f),
+                            center = center,
+                        )
+                    }
+                    drawCircle(color = VibeCoral, radius = base * 0.42f, center = center)
+                    drawBars(center, level, barHeight = size.height * 0.30f)
                 }
             }
             Text(
@@ -381,7 +536,7 @@ private fun RecordingOverlay(level: Float, seconds: Int, partial: String) {
                 color = Color.White,
             )
             Spacer(Modifier.height(4.dp))
-            Text("松开结束", fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+            Text(label, fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
             if (partial.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -399,8 +554,30 @@ private fun RecordingOverlay(level: Float, seconds: Int, partial: String) {
     }
 }
 
+/** 五根竖条，跟着实时音量抖。 */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBars(
+    center: Offset,
+    level: Float,
+    barHeight: Float,
+) {
+    val barWidth = size.width * 0.024f
+    val gap = size.width * 0.022f
+    val heights = floatArrayOf(0.52f, 0.9f, 1.18f, 0.8f, 0.46f)
+    var x = center.x - (barWidth * 5 + gap * 4) / 2f
+    heights.forEach { height ->
+        val half = barHeight * height * (0.7f + level * 0.45f) / 2f
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(x, center.y - half),
+            size = androidx.compose.ui.geometry.Size(barWidth, half * 2),
+            cornerRadius = CornerRadius(barWidth / 2, barWidth / 2),
+        )
+        x += barWidth + gap
+    }
+}
+
 @Composable
-private fun BusyOverlay() {
+private fun BusyOverlay(label: String) {
     Box(
         Modifier
             .fillMaxSize()
@@ -420,7 +597,7 @@ private fun BusyOverlay() {
                 strokeWidth = 2.dp,
             )
             Spacer(Modifier.width(10.dp))
-            Text("转写中…", fontSize = 13.sp, color = VibeInk)
+            Text(label, fontSize = 13.sp, color = VibeInk)
         }
     }
 }
@@ -477,26 +654,45 @@ private fun ResultToast(transcript: Transcript) {
 @Composable
 private fun Dock(
     enabled: Boolean,
+    capsuleEnabled: Boolean,
     recording: Boolean,
+    capsuleRecording: Boolean,
     onVoiceStart: () -> Unit,
     onVoiceEnd: () -> Unit,
     onVoiceCancel: () -> Unit,
     onKey: (String) -> Unit,
-    onCapsule: () -> Unit,
+    onCapsuleTap: () -> Unit,
+    onCapsuleStart: () -> Unit,
+    onCapsuleEnd: () -> Unit,
+    onCapsuleCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        VoiceKey(enabled, recording, onVoiceStart, onVoiceEnd, onVoiceCancel)
+        VoiceKey(
+            enabled = enabled && !capsuleRecording,
+            recording = recording,
+            onStart = onVoiceStart,
+            onEnd = onVoiceEnd,
+            onCancel = onVoiceCancel,
+        )
         Spacer(Modifier.width(14.dp))
         Column(
             Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KeyButton("胶囊", enabled, Modifier.weight(1f)) { if (enabled) onCapsule() }
+                CapsuleKey(
+                    enabled = capsuleEnabled && !recording,
+                    recording = capsuleRecording,
+                    onTap = onCapsuleTap,
+                    onStart = onCapsuleStart,
+                    onEnd = onCapsuleEnd,
+                    onCancel = onCapsuleCancel,
+                    modifier = Modifier.weight(1f),
+                )
                 KeyButton("回车", enabled, Modifier.weight(1f)) { if (enabled) onKey("enter") }
                 KeyButton("删除", enabled, Modifier.weight(1f)) { if (enabled) onKey("delete") }
             }
@@ -509,6 +705,84 @@ private fun Dock(
     }
 }
 
+/**
+ * 胶囊键：轻点开列表，按住录一条。
+ * 按下先等 240ms 再开麦克风，避免轻点时白录一段。
+ */
+@Composable
+private fun CapsuleKey(
+    enabled: Boolean,
+    recording: Boolean,
+    onTap: () -> Unit,
+    onStart: () -> Unit,
+    onEnd: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    var pressed by remember { mutableStateOf(false) }
+    val active = recording || (pressed && enabled)
+
+    Box(
+        modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                when {
+                    recording -> VibeCoral
+                    active -> Color.White
+                    enabled -> Color.White
+                    else -> Color.White.copy(alpha = 0.45f)
+                }
+            )
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(onPress = {
+                    pressed = true
+                    var started = false
+                    val hold = scope.launch {
+                        delay(240)
+                        started = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStart()
+                    }
+                    val released = tryAwaitRelease()
+                    pressed = false
+                    if (started) {
+                        hold.cancel()
+                        if (released) onEnd() else onCancel()
+                    } else {
+                        hold.cancel()
+                        if (released) onTap() else onCancel()
+                    }
+                })
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (active) {
+                Box(
+                    Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(if (recording) Color.White else VibeCoral)
+                )
+                Spacer(Modifier.width(5.dp))
+            }
+            Text(
+                text = if (recording) "录音中" else "胶囊",
+                fontSize = if (recording) 10.sp else 12.sp,
+                color = when {
+                    recording -> Color.White
+                    enabled -> VibeInk
+                    else -> VibeFaint
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun VoiceKey(
     enabled: Boolean,
@@ -517,6 +791,7 @@ private fun VoiceKey(
     onEnd: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     var pressed by remember { mutableStateOf(false) }
     val background = when {
         !enabled -> Brush.linearGradient(listOf(Color(0xFFB9C4D0), Color(0xFF98A3B0)))
@@ -533,6 +808,7 @@ private fun VoiceKey(
                 if (enabled) {
                     detectTapGestures(onPress = {
                         pressed = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onStart()
                         val released = tryAwaitRelease()
                         pressed = false
@@ -591,7 +867,11 @@ private fun KeyButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsSheet(conn: ConnState, onDismiss: () -> Unit, onUnpair: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        contentColor = VibeInk,
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -626,26 +906,332 @@ private fun SettingsSheet(conn: ConnState, onDismiss: () -> Unit, onUnpair: () -
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CapsuleSheet(onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+private fun CapsuleSheet(
+    items: List<Capsule>,
+    onDismiss: () -> Unit,
+    onCopy: (Capsule) -> Unit,
+    onSend: (Capsule) -> Unit,
+    onDelete: (String) -> Unit,
+    onRename: (String, String) -> Unit,
+) {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<Capsule?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var confirmDelete by remember { mutableStateOf<Capsule?>(null) }
+
+    LaunchedEffect(feedback) {
+        if (feedback != null) {
+            delay(1_800)
+            feedback = null
+        }
+    }
+
+    val selected = items.firstOrNull { it.id == selectedId }
+    // 弹层高度显式给：M3 的 sheet 用内容高度，fillMaxHeight 拿不到屏幕约束。
+    val sheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.76f
+    // 默认会停在「半展开」那一档，胶囊列表会被腰斩，这里直接全开。
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        contentColor = VibeInk,
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp)
+                .then(if (items.isEmpty()) Modifier else Modifier.height(sheetHeight))
+                .padding(horizontal = 20.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 26.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(bottom = 18.dp),
         ) {
-            Text("闪念胶囊", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
-            Spacer(Modifier.height(18.dp))
-            Text(
-                "还没有胶囊。胶囊录制正在接入，先用语音键把话打进电脑。",
-                fontSize = 12.sp,
-                lineHeight = 19.sp,
-                color = VibeMuted,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
+            when {
+                selected != null -> CapsuleDetail(
+                    capsule = selected,
+                    feedback = feedback,
+                    modifier = Modifier.weight(1f),
+                    onBack = { selectedId = null },
+                    onCopy = {
+                        onCopy(selected)
+                        feedback = "已复制文字"
+                    },
+                    onSend = {
+                        onSend(selected)
+                        feedback = "已发到电脑光标"
+                    },
+                    onEdit = { editing = selected },
+                    onDelete = { confirmDelete = selected },
+                )
+                else -> CapsuleList(
+                    items = items,
+                    modifier = Modifier.weight(1f),
+                    onOpen = { selectedId = it.id },
+                    onDismiss = onDismiss,
+                )
+            }
         }
     }
+
+    editing?.let { capsule ->
+        var draft by remember(capsule.id) { mutableStateOf(capsule.text) }
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("改一下这段字", fontSize = 16.sp, color = VibeInk) },
+            text = {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRename(capsule.id, draft)
+                    editing = null
+                }) { Text("保存", color = VibeBlue) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editing = null }) {
+                    Text("取消", color = VibeMuted)
+                }
+            },
+        )
+    }
+
+    confirmDelete?.let { capsule ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("删掉这条胶囊？", fontSize = 16.sp, color = VibeInk) },
+            text = {
+                Text(
+                    capsule.text,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = VibeMuted,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(capsule.id)
+                    confirmDelete = null
+                    selectedId = null
+                }) { Text("删除", color = VibeCoral) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = null }) {
+                    Text("取消", color = VibeMuted)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun CapsuleList(
+    items: List<Capsule>,
+    modifier: Modifier = Modifier,
+    onOpen: (Capsule) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("闪念胶囊", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            if (items.isNotEmpty()) {
+                Spacer(Modifier.width(7.dp))
+                Text("${items.size}", fontSize = 13.sp, color = VibeFaint)
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss) {
+                Text("完成", fontSize = 13.sp, color = VibeBlue)
+            }
+        }
+
+        if (items.isEmpty()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 26.dp, bottom = 30.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF2F3F5)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("＋", fontSize = 24.sp, color = VibeFaint)
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("还没有胶囊", fontSize = 15.sp, color = VibeInk)
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "按住遥控器上的胶囊键，把刚才想到的那句话留下来。",
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp,
+                    color = VibeMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            }
+            return@Column
+        }
+
+        Spacer(Modifier.height(10.dp))
+        LazyColumn(
+            Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(items, key = { it.id }) { capsule ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFF5F5F7))
+                        .clickable { onOpen(capsule) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(capsuleTime(capsule.createdAt), fontSize = 11.sp, color = VibeFaint)
+                        Spacer(Modifier.weight(1f))
+                        if (capsule.synced) {
+                            Text(
+                                "已同步",
+                                fontSize = 10.sp,
+                                color = Color(0xFF1F9D43),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color(0x1F30D158))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = capsule.text,
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp,
+                        color = VibeInk,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        text = capsuleMeta(capsule),
+                        fontSize = 11.sp,
+                        color = VibeFaint,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapsuleDetail(
+    capsule: Capsule,
+    feedback: String?,
+    modifier: Modifier = Modifier,
+    onBack: () -> Unit,
+    onCopy: () -> Unit,
+    onSend: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                Text("‹ 返回", fontSize = 13.sp, color = VibeBlue)
+            }
+            Spacer(Modifier.weight(1f))
+            Text(capsuleTime(capsule.createdAt), fontSize = 12.sp, color = VibeFaint)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = capsule.text,
+            fontSize = 18.sp,
+            lineHeight = 28.sp,
+            color = VibeInk,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 90.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFF5F5F7))
+                .padding(16.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+        Row {
+            Text(capsuleMeta(capsule), fontSize = 11.sp, color = VibeFaint)
+            if (feedback != null) {
+                Spacer(Modifier.width(8.dp))
+                Text("· $feedback", fontSize = 11.sp, color = VibeGreen)
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        DetailAction("复制文字", VibeInk, onCopy)
+        Spacer(Modifier.height(8.dp))
+        DetailAction("发到电脑光标", VibeBlue, onSend, primary = true)
+        Spacer(Modifier.height(8.dp))
+        DetailAction("编辑文字", VibeInk, onEdit)
+        Spacer(Modifier.height(8.dp))
+        DetailAction("删除这条胶囊", VibeCoral, onDelete)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "胶囊只存在这台手机，除非你主动发到电脑。",
+            fontSize = 11.sp,
+            color = VibeFaint,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun DetailAction(
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    primary: Boolean = false,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (primary) VibeBlue else Color(0xFFF5F5F7))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = if (primary) Color.White else color,
+        )
+    }
+}
+
+private fun capsuleTime(ms: Long): String {
+    val zone = ZoneId.systemDefault()
+    val at = Instant.ofEpochMilli(ms).atZone(zone)
+    val day = at.toLocalDate()
+    val time = at.format(DateTimeFormatter.ofPattern("HH:mm"))
+    return when (day) {
+        LocalDate.now(zone) -> "今天 $time"
+        LocalDate.now(zone).minusDays(1) -> "昨天 $time"
+        else -> "${day.monthValue} 月 ${day.dayOfMonth} 日 $time"
+    }
+}
+
+private fun capsuleMeta(capsule: Capsule): String {
+    val seconds = capsule.durationMs / 1000
+    val duration = "%d:%02d".format(seconds / 60, seconds % 60)
+    return if (capsule.synced) "$duration · 已同步到电脑" else "$duration · 只在手机"
 }

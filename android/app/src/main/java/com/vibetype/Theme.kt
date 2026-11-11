@@ -29,7 +29,16 @@ private val LightColors = lightColorScheme(
     onSurface = VibeInk,
     surfaceVariant = Color(0xFFECECEF),
     onSurfaceVariant = VibeMuted,
+    // M3 默认的 surfaceContainer 系列带一点粉，底部弹层会发红，这里全压成中性白。
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color(0xFFF5F5F7),
+    surfaceBright = Color.White,
+    surfaceDim = Color(0xFFEBEBEF),
     outline = VibeLine,
+    outlineVariant = Color(0x0F000000),
     error = Color(0xFFFF453A),
 )
 

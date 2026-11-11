@@ -7,9 +7,14 @@ import com.vibetype.asr.Corrected
 import com.vibetype.asr.TermCorrector
 import com.vibetype.asr.XAsr
 import com.vibetype.audio.Recorder
+import com.vibetype.capsule.Capsule
+import com.vibetype.capsule.CapsuleStore
 import com.vibetype.net.ConnState
 import com.vibetype.net.DesktopClient
 import com.vibetype.net.PairingStore
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +46,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val client = DesktopClient(settings)
     private val recorder = Recorder()
     private val corrector = TermCorrector(app.assets)
+    private val capsuleStore = CapsuleStore(app)
+
+    val capsules: StateFlow<List<Capsule>> = capsuleStore.items
+
+    /** 胶囊录制的实时文字，和语音键分开，浮层颜色也不一样。 */
+    private val _capsulePartial = MutableStateFlow("")
+    val capsulePartial: StateFlow<String> = _capsulePartial.asStateFlow()
+
+    private val _capsuleRecording = MutableStateFlow(false)
+    val capsuleRecording: StateFlow<Boolean> = _capsuleRecording.asStateFlow()
+
+    private val _capsuleSaving = MutableStateFlow(false)
+    val capsuleSaving: StateFlow<Boolean> = _capsuleSaving.asStateFlow()
+
+    /** 刚存下一条胶囊时发一次，用来放「飞进胶囊」的动效。 */
+    private val _capsuleSaved = MutableSharedFlow<Capsule>(extraBufferCapacity = 4)
+    val capsuleSaved: SharedFlow<Capsule> = _capsuleSaved.asSharedFlow()
 
     val level: StateFlow<Float> = recorder.level
     val connection: StateFlow<ConnState> = client.state
@@ -76,6 +98,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         client.start()
         loadModel()
+        viewModelScope.launch { capsuleStore.load() }
         viewModelScope.launch {
             client.state.collect { state ->
                 if (state is ConnState.NeedsPairing) {
@@ -110,7 +133,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun beginTalk() {
-        if (_recording.value || _busy.value || _model.value !is ModelState.Ready) return
+        if (_recording.value || _busy.value || _capsuleRecording.value || _capsuleSaving.value) return
+        if (_model.value !is ModelState.Ready) return
         _notice.value = null
         _partial.value = ""
 
@@ -160,6 +184,110 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         recorder.cancel()
         asr?.cancel()
         _partial.value = ""
+    }
+
+    /**
+     * 胶囊录制：和语音键走同一套流式引擎，但文字不上屏，落成本地一条胶囊。
+     * 没连电脑也能用，胶囊本来就是留给自己回头看的。
+     */
+    fun beginCapsule() {
+        if (_recording.value || _capsuleRecording.value || _busy.value || _capsuleSaving.value) return
+        if (_model.value !is ModelState.Ready) {
+            _notice.value = "模型还没准备好"
+            return
+        }
+        _notice.value = null
+        _capsulePartial.value = ""
+        val engine = asr ?: return
+        engine.start()
+        recorder.onChunk = { chunk ->
+            val text = runCatching { engine.accept(chunk) }.getOrDefault("")
+            if (text.isNotEmpty()) _capsulePartial.value = text
+        }
+        if (recorder.start()) {
+            _capsuleRecording.value = true
+        } else {
+            recorder.onChunk = null
+            engine.cancel()
+            _notice.value = "麦克风打不开，检查录音权限"
+        }
+    }
+
+    fun endCapsule() {
+        if (!_capsuleRecording.value) return
+        _capsuleRecording.value = false
+        recorder.onChunk = null
+        val pcm = recorder.stop()
+        val minSamples = Recorder.SAMPLE_RATE * 4 / 10
+        if (pcm.size < minSamples) {
+            asr?.cancel()
+            _capsulePartial.value = ""
+            _notice.value = "说话时间太短"
+            return
+        }
+        saveCapsule(pcm.size * 1000 / Recorder.SAMPLE_RATE)
+    }
+
+    fun cancelCapsule() {
+        if (!_capsuleRecording.value) return
+        _capsuleRecording.value = false
+        recorder.onChunk = null
+        recorder.cancel()
+        asr?.cancel()
+        _capsulePartial.value = ""
+    }
+
+    private fun saveCapsule(durationMs: Int) {
+        val engine = asr ?: return
+        _capsuleSaving.value = true
+        viewModelScope.launch(Dispatchers.Default) {
+            val raw = runCatching { engine.finish() }.getOrDefault("")
+            _capsulePartial.value = ""
+            if (raw.isBlank()) {
+                _capsuleSaving.value = false
+                _notice.value = "没听清，再来一次"
+                return@launch
+            }
+            val text = corrector.correct(raw).text
+            val capsule = capsuleStore.add(text, durationMs)
+            _capsuleSaving.value = false
+            _capsuleSaved.tryEmit(capsule)
+        }
+    }
+
+    fun deleteCapsule(id: String) {
+        viewModelScope.launch { capsuleStore.remove(id) }
+    }
+
+    fun renameCapsule(id: String, text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch { capsuleStore.updateText(id, text) }
+    }
+
+    /** 把一条胶囊打进电脑光标，成功后标记为已同步。 */
+    fun sendCapsuleToDesktop(capsule: Capsule) {
+        if (client.state.value !is ConnState.Connected) {
+            _notice.value = "先连上电脑"
+            return
+        }
+        viewModelScope.launch {
+            val ok = client.sendText(capsule.text, 0, "zh")
+            if (ok) {
+                capsuleStore.markSynced(capsule.id)
+                _notice.value = "已发到电脑光标"
+            } else {
+                _notice.value = "没发出去，检查连接"
+            }
+        }
+    }
+
+    fun copyCapsule(capsule: Capsule) {
+        val app = getApplication<Application>()
+        val manager = app.getSystemService(android.content.ClipboardManager::class.java)
+        manager?.setPrimaryClip(
+            android.content.ClipData.newPlainText("VibeType 胶囊", capsule.text)
+        )
+        _notice.value = "已复制"
     }
 
     /** 松手后补静音、取最终文本，走术语纠正再发送。 */
