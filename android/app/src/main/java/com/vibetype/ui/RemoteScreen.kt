@@ -93,12 +93,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibetype.AckState
+import com.vibetype.AppLanguage
+import com.vibetype.Copy
+import com.vibetype.ThemeMode
 import com.vibetype.MainViewModel
 import com.vibetype.ModelState
 import com.vibetype.Transcript
 import com.vibetype.VibeBlue
+import com.vibetype.VibeCard
+import com.vibetype.VibeCapsuleIdleBottom
+import com.vibetype.VibeCapsuleIdleTop
+import com.vibetype.VibeCapsulePressed
+import com.vibetype.VibeCapsuleTintBottom
+import com.vibetype.VibeCapsuleTintTop
 import com.vibetype.VibeCoral
 import com.vibetype.VibeFaint
+import com.vibetype.VibeField
+import com.vibetype.VibeGreenText
+import com.vibetype.VibeGreenTint
+import com.vibetype.VibeLine
+import com.vibetype.VibeSelected
 import com.vibetype.VibeGreen
 import com.vibetype.VibeInk
 import com.vibetype.VibeMuted
@@ -149,6 +163,8 @@ fun RemoteScreen(
     val naturalScroll by vm.naturalScroll.collectAsState()
     val edgeScrollSpeed by vm.edgeScrollSpeed.collectAsState()
     val keymap by vm.keymap.collectAsState()
+    val language by vm.language.collectAsState()
+    val themeMode by vm.themeMode.collectAsState()
     val pendingCapsules = capsules.count { !it.synced }
 
     // 第一次连上之后自动弹一次手势说明
@@ -197,7 +213,7 @@ fun RemoteScreen(
             ConnectionPill(conn)
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { showSettings = true }) {
-                Text("设置", fontSize = 12.sp, color = VibeMuted)
+                Text(Copy.t("设置", "Settings"), fontSize = 12.sp, color = VibeMuted)
             }
         }
 
@@ -260,6 +276,10 @@ fun RemoteScreen(
             naturalScroll = naturalScroll,
             edgeScrollSpeed = edgeScrollSpeed,
             debuggable = vm.debuggable,
+            language = language,
+            themeMode = themeMode,
+            onLanguage = vm::setLanguage,
+            onThemeMode = vm::setThemeMode,
             onDismiss = { showSettings = false },
             onSelfTest = {
                 showSettings = false
@@ -311,16 +331,16 @@ fun RemoteScreen(
 @Composable
 private fun ConnectionPill(conn: ConnState) {
     val (color, label) = when (conn) {
-        ConnState.Idle -> VibeFaint to "未连接"
-        ConnState.Connecting -> Color(0xFFFF9F0A) to "连接中"
-        is ConnState.Connected -> VibeGreen to "已连接"
-        is ConnState.Failed -> VibeCoral to "未连接"
-        is ConnState.NeedsPairing -> VibeCoral to "未配对"
+        ConnState.Idle -> VibeFaint to Copy.t("未连接", "Not connected")
+        ConnState.Connecting -> Color(0xFFFF9F0A) to Copy.t("连接中", "Connecting…")
+        is ConnState.Connected -> VibeGreen to Copy.t("已连接", "Connected")
+        is ConnState.Failed -> VibeCoral to Copy.t("未连接", "Not connected")
+        is ConnState.NeedsPairing -> VibeCoral to Copy.t("未配对", "Not paired")
     }
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color.White)
+            .background(VibeCard)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -397,24 +417,24 @@ private fun Trackpad(
                 level = level,
                 seconds = seconds,
                 partial = partial,
-                label = "松开保存，自动写进胶囊",
+                label = Copy.t("松开保存，自动写进胶囊", "Release to save to Capsule"),
                 capsule = true,
             )
             recording -> RecordingOverlay(
                 level = level,
                 seconds = seconds,
                 partial = partial,
-                label = "松开结束，文字会打进电脑光标",
+                label = Copy.t("松开结束，文字会打进电脑光标", "Release to type at the cursor"),
                 capsule = false,
             )
-            capsuleSaving -> BusyOverlay(label = "存进胶囊…")
-            busy -> BusyOverlay(label = "转写中…")
+            capsuleSaving -> BusyOverlay(label = Copy.t("存进胶囊…", "Saving to Capsule…"))
+            busy -> BusyOverlay(label = Copy.t("转写中…", "Transcribing…"))
             last != null -> ResultToast(last, onRetry = onRetry, onOpen = onOpenTranscript)
         }
 
         if (connected && !recording && !capsuleRecording && !busy && last == null) {
             Text(
-                text = if (leftHanded) "轻点左键 · 双指滚动 · 左缘滚动" else "轻点左键 · 双指滚动 · 右缘滚动",
+                text = if (leftHanded) Copy.t("轻点左键 · 双指滚动 · 左缘滚动", "Tap: left click · Two fingers: scroll · Left edge: scroll") else Copy.t("轻点左键 · 双指滚动 · 右缘滚动", "Tap: left click · Two fingers: scroll · Right edge: scroll"),
                 fontSize = 11.sp,
                 color = Color.White.copy(alpha = 0.28f),
                 modifier = Modifier
@@ -467,7 +487,7 @@ private fun BoxScope.CapsuleFlight(capsule: Capsule, onDone: () -> Unit) {
                 alpha = 1f - p * p
             }
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White)
+            .background(VibeCard)
             .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
         Column(horizontalAlignment = Alignment.Start) {
@@ -487,7 +507,7 @@ private fun BoxScope.CapsuleFlight(capsule: Capsule, onDone: () -> Unit) {
                     )
                 }
                 Spacer(Modifier.width(7.dp))
-                Text("已存进胶囊", fontSize = 11.sp, color = VibeCoral)
+                Text(Copy.t("已存进胶囊", "Saved to Capsule"), fontSize = 11.sp, color = VibeCoral)
             }
             Spacer(Modifier.height(7.dp))
             Text(
@@ -633,10 +653,10 @@ private fun DisconnectedOverlay() {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("先连上电脑", fontSize = 15.sp, color = Color.White.copy(alpha = 0.8f))
+            Text(Copy.t("先连上电脑", "Connect to your computer first"), fontSize = 15.sp, color = Color.White.copy(alpha = 0.8f))
             Spacer(Modifier.height(5.dp))
             Text(
-                "配对之后，触控板和按键才有用",
+                Copy.t("配对之后，触控板和按键才有用", "The trackpad and keys work after pairing"),
                 fontSize = 12.sp,
                 color = Color.White.copy(alpha = 0.42f),
             )
@@ -761,7 +781,7 @@ private fun BusyOverlay(label: String) {
         Row(
             Modifier
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
+                .background(VibeCard)
                 .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -795,7 +815,7 @@ private fun ResultToast(
                 }
             )
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
+            .background(VibeCard)
             .padding(horizontal = 13.dp, vertical = 11.dp),
     ) {
         Box(
@@ -836,10 +856,10 @@ private fun ResultToast(
                 overflow = TextOverflow.Ellipsis,
             )
             if (transcript.ack == AckState.Failed) {
-                Text("点一下重发", fontSize = 10.sp, color = VibeCoral)
+                Text(Copy.t("点一下重发", "Tap to resend"), fontSize = 10.sp, color = VibeCoral)
             } else if (long) {
                 Text(
-                    "共 ${transcript.text.length} 字 · 点开看全文",
+                    Copy.t("共 ${transcript.text.length} 字 · 点开看全文", "${transcript.text.length} characters · Tap for full text"),
                     fontSize = 10.sp,
                     color = VibeBlue,
                 )
@@ -942,11 +962,11 @@ private fun DockKeys(
     ) {
         val keys = keymap.ifEmpty {
             listOf(
-                KeySlot("k1", "回车"),
-                KeySlot("k2", "删除"),
+                KeySlot("k1", Copy.t("回车", "Enter")),
+                KeySlot("k2", Copy.t("删除", "Delete")),
                 KeySlot("k3", "Esc"),
-                KeySlot("k4", "切换"),
-                KeySlot("k5", "自定义"),
+                KeySlot("k4", Copy.t("切换", "Switch")),
+                KeySlot("k5", Copy.t("自定义", "Custom")),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -961,14 +981,14 @@ private fun DockKeys(
                 modifier = Modifier.weight(1f),
             )
             keys.take(2).forEach { slot ->
-                KeyButton(slot.label, enabled, Modifier.weight(1f)) {
+                KeyButton(keyLabel(slot), enabled, Modifier.weight(1f)) {
                     if (enabled) onKey(slot.id)
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             keys.drop(2).take(3).forEach { slot ->
-                KeyButton(slot.label, enabled, Modifier.weight(1f)) {
+                KeyButton(keyLabel(slot), enabled, Modifier.weight(1f)) {
                     if (enabled) onKey(slot.id)
                 }
             }
@@ -1023,9 +1043,9 @@ private fun CapsuleKey(
 
     val tint = when {
         recording -> VibeCoral
-        pressed -> Color(0xFFFFE1D7)
-        enabled -> Color(0xFFFFF0EB)
-        else -> Color(0xFFF3F3F5)
+        pressed -> VibeCapsulePressed
+        enabled -> VibeCapsuleTintTop
+        else -> VibeCapsuleIdleTop
     }
     val glyph = when {
         recording -> Color.White
@@ -1042,9 +1062,9 @@ private fun CapsuleKey(
                 if (recording) {
                     Brush.linearGradient(listOf(VibeCoral, VibeCoral))
                 } else if (enabled) {
-                    Brush.verticalGradient(listOf(Color(0xFFFFF4F0), Color(0xFFFFE8E0)))
+                    Brush.verticalGradient(listOf(VibeCapsuleTintTop, VibeCapsuleTintBottom))
                 } else {
-                    Brush.verticalGradient(listOf(Color(0xFFF5F5F7), Color(0xFFEFEFF1)))
+                    Brush.verticalGradient(listOf(VibeField, VibeCapsuleIdleBottom))
                 }
             )
             .then(
@@ -1082,7 +1102,7 @@ private fun CapsuleKey(
             }
             .semantics {
                 role = Role.Button
-                contentDescription = if (recording) "录音中" else "闪念胶囊"
+                contentDescription = if (recording) Copy.t("录音中", "Recording") else Copy.t("闪念胶囊", "Capsule")
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -1251,8 +1271,21 @@ private fun VoiceKey(
                 }
             }
             Spacer(Modifier.height(5.dp))
-            Text("按住说话", fontSize = 10.sp, color = Color.White.copy(alpha = 0.9f))
+            Text(Copy.t("按住说话", "Hold to talk"), fontSize = 10.sp, color = Color.White.copy(alpha = 0.9f))
         }
+    }
+}
+
+
+/** 桌面下发的默认键名是中文；英文界面下只翻译这几个内置名字，用户自定义的名字不动。 */
+private fun keyLabel(slot: KeySlot): String {
+    if (!Copy.english) return slot.label
+    return when (slot.label) {
+        "回车" -> "Enter"
+        "删除" -> "Delete"
+        "切换" -> "Switch"
+        "自定义" -> "Custom"
+        else -> slot.label
     }
 }
 
@@ -1275,7 +1308,7 @@ private fun KeyButton(
             .height(52.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = if (enabled) 1f else 0.45f))
+            .background(VibeCard.copy(alpha = if (enabled) 1f else 0.45f))
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,
@@ -1306,6 +1339,10 @@ private fun SettingsSheet(
     naturalScroll: Boolean,
     edgeScrollSpeed: Float,
     debuggable: Boolean,
+    language: AppLanguage,
+    themeMode: ThemeMode,
+    onLanguage: (AppLanguage) -> Unit,
+    onThemeMode: (ThemeMode) -> Unit,
     onDismiss: () -> Unit,
     onToggleLeftHanded: (Boolean) -> Unit,
     onSpeedChange: (Float) -> Unit,
@@ -1319,7 +1356,7 @@ private fun SettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = VibeCard,
         contentColor = VibeInk,
     ) {
         Column(
@@ -1330,20 +1367,20 @@ private fun SettingsSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 18.dp),
         ) {
-            Text("设置", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            Text(Copy.t("设置", "Settings"), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
             Spacer(Modifier.height(18.dp))
 
-            SettingsGroup("电脑") {
+            SettingsGroup(Copy.t("电脑", "Computer")) {
                 SettingsRow(
-                    title = "当前电脑",
+                    title = Copy.t("当前电脑", "This computer"),
                     value = when (conn) {
                         is ConnState.Connected ->
                             if (conn.platform == "macos") "Mac" else "Windows"
-                        else -> "未连接"
+                        else -> Copy.t("未连接", "Not connected")
                     },
                 )
                 SettingsRow(
-                    title = "换电脑 / 解除配对",
+                    title = Copy.t("换电脑 / 解除配对", "Change computer / Unpair"),
                     value = "",
                     danger = true,
                     onClick = onUnpair,
@@ -1351,15 +1388,15 @@ private fun SettingsSheet(
             }
 
             Spacer(Modifier.height(16.dp))
-            SettingsGroup("遥控器") {
-                SettingsRow(title = "手势说明", value = "", onClick = onShowGestures)
+            SettingsGroup(Copy.t("遥控器", "Remote")) {
+                SettingsRow(title = Copy.t("手势说明", "Gestures"), value = "", onClick = onShowGestures)
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .padding(vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("左手模式", fontSize = 14.sp, color = VibeInk)
+                    Text(Copy.t("左手模式", "Left-handed"), fontSize = 14.sp, color = VibeInk)
                     Spacer(Modifier.weight(1f))
                     Switch(
                         checked = leftHanded,
@@ -1373,7 +1410,7 @@ private fun SettingsSheet(
 
                 Column(Modifier.padding(bottom = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("指针速度", fontSize = 14.sp, color = VibeInk)
+                        Text(Copy.t("指针速度", "Pointer speed"), fontSize = 14.sp, color = VibeInk)
                         Spacer(Modifier.weight(1f))
                         Text(speedLabel(pointerSpeed), fontSize = 12.sp, color = VibeMuted)
                     }
@@ -1388,15 +1425,15 @@ private fun SettingsSheet(
                         ),
                     )
                     Row(Modifier.fillMaxWidth()) {
-                        Text("慢", fontSize = 10.sp, color = VibeFaint)
+                        Text(Copy.t("慢", "Slow"), fontSize = 10.sp, color = VibeFaint)
                         Spacer(Modifier.weight(1f))
-                        Text("快", fontSize = 10.sp, color = VibeFaint)
+                        Text(Copy.t("快", "Fast"), fontSize = 10.sp, color = VibeFaint)
                     }
                 }
 
                 Column(Modifier.padding(bottom = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("边缘滚动", fontSize = 14.sp, color = VibeInk)
+                        Text(Copy.t("边缘滚动", "Edge scroll"), fontSize = 14.sp, color = VibeInk)
                         Spacer(Modifier.weight(1f))
                         Text(edgeSpeedLabel(edgeScrollSpeed), fontSize = 12.sp, color = VibeMuted)
                     }
@@ -1411,9 +1448,9 @@ private fun SettingsSheet(
                         ),
                     )
                     Row(Modifier.fillMaxWidth()) {
-                        Text("慢", fontSize = 10.sp, color = VibeFaint)
+                        Text(Copy.t("慢", "Slow"), fontSize = 10.sp, color = VibeFaint)
                         Spacer(Modifier.weight(1f))
-                        Text("快", fontSize = 10.sp, color = VibeFaint)
+                        Text(Copy.t("快", "Fast"), fontSize = 10.sp, color = VibeFaint)
                     }
                 }
 
@@ -1423,7 +1460,7 @@ private fun SettingsSheet(
                         .padding(bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("自然滚动", fontSize = 14.sp, color = VibeInk)
+                    Text(Copy.t("自然滚动", "Natural scroll"), fontSize = 14.sp, color = VibeInk)
                     Spacer(Modifier.weight(1f))
                     Switch(
                         checked = naturalScroll,
@@ -1437,15 +1474,39 @@ private fun SettingsSheet(
             }
 
             Spacer(Modifier.height(16.dp))
-            SettingsGroup("胶囊") {
-                SettingsRow(title = "保存位置", value = "这台手机")
-                SettingsRow(title = "转写", value = "手机本地")
+            SettingsGroup(Copy.t("胶囊", "Capsule")) {
+                SettingsRow(title = Copy.t("保存位置", "Stored on"), value = Copy.t("这台手机", "This phone"))
+                SettingsRow(title = Copy.t("转写", "Transcription"), value = Copy.t("手机本地", "On device"))
+            }
+
+            Spacer(Modifier.height(16.dp))
+            SettingsGroup(Copy.t("通用", "General")) {
+                SettingsChoice(
+                    title = Copy.t("语言", "Language"),
+                    options = listOf(
+                        Copy.t("自动", "Auto") to AppLanguage.Auto.id,
+                        "中文" to AppLanguage.Chinese.id,
+                        "English" to AppLanguage.English.id,
+                    ),
+                    selected = language.id,
+                    onSelect = { onLanguage(AppLanguage.fromId(it)) },
+                )
+                SettingsChoice(
+                    title = Copy.t("外观", "Appearance"),
+                    options = listOf(
+                        Copy.t("自动", "Auto") to ThemeMode.Auto.id,
+                        Copy.t("浅色", "Light") to ThemeMode.Light.id,
+                        Copy.t("深色", "Dark") to ThemeMode.Dark.id,
+                    ),
+                    selected = themeMode.id,
+                    onSelect = { onThemeMode(ThemeMode.fromId(it)) },
+                )
             }
 
             if (debuggable) {
                 Spacer(Modifier.height(16.dp))
-                SettingsGroup("调试") {
-                    SettingsRow(title = "跑一段自检音频", value = "", onClick = onSelfTest)
+                SettingsGroup(Copy.t("调试", "Debug")) {
+                    SettingsRow(title = Copy.t("跑一段自检音频", "Run a self-test clip"), value = "", onClick = onSelfTest)
                 }
             }
 
@@ -1456,6 +1517,49 @@ private fun SettingsSheet(
 }
 
 
+
+@Composable
+private fun SettingsChoice(
+    title: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, fontSize = 14.sp, color = VibeInk)
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(VibeField)
+                .padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            options.forEach { (label, value) ->
+                val on = value == selected
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(if (on) VibeSelected else Color.Transparent)
+                        .clickable { onSelect(value) }
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                ) {
+                    Text(
+                        label,
+                        fontSize = 11.sp,
+                        color = if (on) VibeInk else VibeMuted,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsGroup(label: String, content: @Composable ColumnScope.() -> Unit) {
     Text(label, fontSize = 11.sp, color = VibeFaint)
@@ -1464,7 +1568,7 @@ private fun SettingsGroup(label: String, content: @Composable ColumnScope.() -> 
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFF5F5F7))
+            .background(VibeField)
             .padding(horizontal = 16.dp),
         content = content,
     )
@@ -1653,21 +1757,21 @@ private fun GestureDemo(selected: Int) {
 @Composable
 private fun GestureSheet(onDismiss: () -> Unit) {
     val rows = listOf(
-        "单指移动" to "移动鼠标",
-        "轻点" to "左键",
-        "双指滑动" to "滚动页面",
-        "双指轻点" to "右键",
-        "双指捏合" to "放大 / 缩小",
-        "停住再拖" to "按住左键拖拽",
-        "边缘滑动" to "滚动，不碰鼠标位置",
-        "按住胶囊键" to "存一条闪念",
+        Copy.t("单指移动", "One finger") to Copy.t("移动鼠标", "Move pointer"),
+        Copy.t("轻点", "Tap") to Copy.t("左键", "Left click"),
+        Copy.t("双指滑动", "Two fingers") to Copy.t("滚动页面", "Scroll"),
+        Copy.t("双指轻点", "Two-finger tap") to Copy.t("右键", "Right click"),
+        Copy.t("双指捏合", "Pinch") to Copy.t("放大 / 缩小", "Zoom in / out"),
+        Copy.t("停住再拖", "Hold, then drag") to Copy.t("按住左键拖拽", "Left-button drag"),
+        Copy.t("边缘滑动", "Edge swipe") to Copy.t("滚动，不碰鼠标位置", "Scroll, pointer stays"),
+        Copy.t("按住胶囊键", "Capsule key") to Copy.t("存一条闪念", "Save a thought"),
     )
     var selected by remember { mutableIntStateOf(0) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = VibeCard,
         contentColor = VibeInk,
     ) {
         Column(
@@ -1678,14 +1782,14 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                 .navigationBarsPadding()
                 .padding(bottom = 18.dp),
         ) {
-            Text("触控板手势", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            Text(Copy.t("触控板手势", "Trackpad gestures"), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
             Spacer(Modifier.height(12.dp))
             key(selected) {
                 GestureDemo(selected)
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "点一行看演示",
+                Copy.t("点一行看演示", "Tap a row to see it"),
                 fontSize = 10.sp,
                 color = VibeFaint,
                 modifier = Modifier.fillMaxWidth(),
@@ -1697,7 +1801,7 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (index == selected) Color(0xFFF2F3F5) else Color.Transparent)
+                        .background(if (index == selected) VibeField else Color.Transparent)
                         .clickable { selected = index }
                         .padding(vertical = 10.dp, horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1708,7 +1812,7 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                         color = VibeInk,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFF2F3F5))
+                            .background(VibeField)
                             .padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -1725,11 +1829,11 @@ private fun GestureSheet(onDismiss: () -> Unit) {
                     .clickable(onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("知道了", fontSize = 14.sp, color = Color.White)
+                Text(Copy.t("知道了", "Got it"), fontSize = 14.sp, color = Color.White)
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "之后可以从「设置 → 手势说明」再打开。",
+                Copy.t("之后可以从「设置 → 手势说明」再打开。", "You can reopen this from Settings → Gestures."),
                 fontSize = 11.sp,
                 color = VibeFaint,
                 modifier = Modifier.fillMaxWidth(),
@@ -1749,7 +1853,7 @@ private fun TranscriptSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = VibeCard,
         contentColor = VibeInk,
     ) {
         Column(
@@ -1760,9 +1864,9 @@ private fun TranscriptSheet(
                 .padding(bottom = 18.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("这次说的话", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+                Text(Copy.t("这次说的话", "This time"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
                 Spacer(Modifier.weight(1f))
-                Text("${text.length} 字", fontSize = 12.sp, color = VibeFaint)
+                Text(Copy.t("${text.length} 字", "${text.length} characters"), fontSize = 12.sp, color = VibeFaint)
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -1775,12 +1879,12 @@ private fun TranscriptSheet(
                     .heightIn(max = 420.dp)
                     .verticalScroll(rememberScrollState())
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF5F5F7))
+                    .background(VibeField)
                     .padding(16.dp),
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                if (corrected > 0) "已更正 $corrected 处术语" else "全部内容都在这儿，没有丢字",
+                if (corrected > 0) Copy.t("已更正 $corrected 处术语", "$corrected terms corrected") else Copy.t("全部内容都在这儿，没有丢字", "Everything is here, nothing was lost"),
                 fontSize = 11.sp,
                 color = VibeFaint,
             )
@@ -1791,11 +1895,11 @@ private fun TranscriptSheet(
                         .weight(1f)
                         .height(46.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFF5F5F7))
+                        .background(VibeField)
                         .clickable(onClick = onCopy),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("复制全文", fontSize = 14.sp, color = VibeInk)
+                    Text(Copy.t("复制全文", "Copy all"), fontSize = 14.sp, color = VibeInk)
                 }
                 Box(
                     Modifier
@@ -1806,7 +1910,7 @@ private fun TranscriptSheet(
                         .clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("知道了", fontSize = 14.sp, color = Color.White)
+                    Text(Copy.t("知道了", "Got it"), fontSize = 14.sp, color = Color.White)
                 }
             }
         }
@@ -1844,7 +1948,7 @@ private fun CapsuleSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = VibeCard,
         contentColor = VibeInk,
     ) {
         Column(
@@ -1863,11 +1967,11 @@ private fun CapsuleSheet(
                     onBack = { selectedId = null },
                     onCopy = {
                         onCopy(selected)
-                        feedback = "已复制文字"
+                        feedback = Copy.t("已复制文字", "Text copied")
                     },
                     onSend = {
                         onSend(selected)
-                        feedback = "已发到电脑光标"
+                        feedback = Copy.t("已发到电脑光标", "Sent to the cursor")
                     },
                     onEdit = { editing = selected },
                     onDelete = { confirmDelete = selected },
@@ -1886,7 +1990,7 @@ private fun CapsuleSheet(
         var draft by remember(capsule.id) { mutableStateOf(capsule.text) }
         AlertDialog(
             onDismissRequest = { editing = null },
-            title = { Text("改一下这段字", fontSize = 16.sp, color = VibeInk) },
+            title = { Text(Copy.t("改一下这段字", "Edit this capsule"), fontSize = 16.sp, color = VibeInk) },
             text = {
                 OutlinedTextField(
                     value = draft,
@@ -1899,11 +2003,11 @@ private fun CapsuleSheet(
                 TextButton(onClick = {
                     onRename(capsule.id, draft)
                     editing = null
-                }) { Text("保存", color = VibeBlue) }
+                }) { Text(Copy.t("保存", "Save"), color = VibeBlue) }
             },
             dismissButton = {
                 TextButton(onClick = { editing = null }) {
-                    Text("取消", color = VibeMuted)
+                    Text(Copy.t("取消", "Cancel"), color = VibeMuted)
                 }
             },
         )
@@ -1912,7 +2016,7 @@ private fun CapsuleSheet(
     confirmDelete?.let { capsule ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("删掉这条胶囊？", fontSize = 16.sp, color = VibeInk) },
+            title = { Text(Copy.t("删掉这条胶囊？", "Delete this capsule?"), fontSize = 16.sp, color = VibeInk) },
             text = {
                 Text(
                     capsule.text,
@@ -1928,11 +2032,11 @@ private fun CapsuleSheet(
                     onDelete(capsule.id)
                     confirmDelete = null
                     selectedId = null
-                }) { Text("删除", color = VibeCoral) }
+                }) { Text(Copy.t("删除", "Delete"), color = VibeCoral) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) {
-                    Text("取消", color = VibeMuted)
+                    Text(Copy.t("取消", "Cancel"), color = VibeMuted)
                 }
             },
         )
@@ -1948,14 +2052,14 @@ private fun CapsuleList(
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("闪念胶囊", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
+            Text(Copy.t("闪念胶囊", "Capsules"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VibeInk)
             if (items.isNotEmpty()) {
                 Spacer(Modifier.width(7.dp))
                 Text("${items.size}", fontSize = 13.sp, color = VibeFaint)
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) {
-                Text("完成", fontSize = 13.sp, color = VibeBlue)
+                Text(Copy.t("完成", "Done"), fontSize = 13.sp, color = VibeBlue)
             }
         }
 
@@ -1970,16 +2074,16 @@ private fun CapsuleList(
                     Modifier
                         .size(54.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF2F3F5)),
+                        .background(VibeField),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("＋", fontSize = 24.sp, color = VibeFaint)
                 }
                 Spacer(Modifier.height(14.dp))
-                Text("还没有胶囊", fontSize = 15.sp, color = VibeInk)
+                Text(Copy.t("还没有胶囊", "No capsules yet"), fontSize = 15.sp, color = VibeInk)
                 Spacer(Modifier.height(7.dp))
                 Text(
-                    "按住遥控器上的胶囊键，把刚才想到的那句话留下来。",
+                    Copy.t("按住遥控器上的胶囊键，把刚才想到的那句话留下来。", "Hold the Capsule key on the remote to keep the thought you just had."),
                     fontSize = 12.sp,
                     lineHeight = 19.sp,
                     color = VibeMuted,
@@ -2000,7 +2104,7 @@ private fun CapsuleList(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFF5F5F7))
+                        .background(VibeField)
                         .clickable { onOpen(capsule) }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
@@ -2009,12 +2113,12 @@ private fun CapsuleList(
                         Spacer(Modifier.weight(1f))
                         if (capsule.synced) {
                             Text(
-                                "已同步",
+                                Copy.t("已同步", "Synced"),
                                 fontSize = 10.sp,
-                                color = Color(0xFF1F9D43),
+                                color = VibeGreenText,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .background(Color(0x1F30D158))
+                                    .background(VibeGreenTint)
                                     .padding(horizontal = 7.dp, vertical = 2.dp),
                             )
                         }
@@ -2058,7 +2162,7 @@ private fun CapsuleDetail(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                Text("‹ 返回", fontSize = 13.sp, color = VibeBlue)
+                Text(Copy.t("‹ 返回", "‹ Back"), fontSize = 13.sp, color = VibeBlue)
             }
             Spacer(Modifier.weight(1f))
             Text(capsuleTime(capsule.createdAt), fontSize = 12.sp, color = VibeFaint)
@@ -2073,7 +2177,7 @@ private fun CapsuleDetail(
                 .fillMaxWidth()
                 .heightIn(min = 90.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFFF5F5F7))
+                .background(VibeField)
                 .padding(16.dp),
         )
         Spacer(Modifier.height(10.dp))
@@ -2085,16 +2189,16 @@ private fun CapsuleDetail(
             }
         }
         Spacer(Modifier.height(18.dp))
-        DetailAction("复制文字", VibeInk, onCopy)
+        DetailAction(Copy.t("复制文字", "Copy text"), VibeInk, onCopy)
         Spacer(Modifier.height(8.dp))
-        DetailAction("发到电脑光标", VibeBlue, onSend, primary = true)
+        DetailAction(Copy.t("发到电脑光标", "Type at the cursor"), VibeBlue, onSend, primary = true)
         Spacer(Modifier.height(8.dp))
-        DetailAction("编辑文字", VibeInk, onEdit)
+        DetailAction(Copy.t("编辑文字", "Edit text"), VibeInk, onEdit)
         Spacer(Modifier.height(8.dp))
-        DetailAction("删除这条胶囊", VibeCoral, onDelete)
+        DetailAction(Copy.t("删除这条胶囊", "Delete capsule"), VibeCoral, onDelete)
         Spacer(Modifier.height(12.dp))
         Text(
-            "胶囊只存在这台手机，除非你主动发到电脑。",
+            Copy.t("胶囊只存在这台手机，除非你主动发到电脑。", "Capsules stay on this phone unless you send one to your computer."),
             fontSize = 11.sp,
             color = VibeFaint,
             modifier = Modifier.fillMaxWidth(),
@@ -2115,7 +2219,7 @@ private fun DetailAction(
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (primary) VibeBlue else Color(0xFFF5F5F7))
+            .background(if (primary) VibeBlue else VibeField)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -2133,29 +2237,29 @@ private fun capsuleTime(ms: Long): String {
     val day = at.toLocalDate()
     val time = at.format(DateTimeFormatter.ofPattern("HH:mm"))
     return when (day) {
-        LocalDate.now(zone) -> "今天 $time"
-        LocalDate.now(zone).minusDays(1) -> "昨天 $time"
-        else -> "${day.monthValue} 月 ${day.dayOfMonth} 日 $time"
+        LocalDate.now(zone) -> Copy.t("今天 $time", "Today $time")
+        LocalDate.now(zone).minusDays(1) -> Copy.t("昨天 $time", "Yesterday $time")
+        else -> Copy.t("${day.monthValue} 月 ${day.dayOfMonth} 日 $time", "${day.monthValue}/${day.dayOfMonth} $time")
     }
 }
 
 private fun capsuleMeta(capsule: Capsule): String {
     val seconds = capsule.durationMs / 1000
     val duration = "%d:%02d".format(seconds / 60, seconds % 60)
-    return if (capsule.synced) "$duration · 已同步到电脑" else "$duration · 只在手机"
+    return if (capsule.synced) Copy.t("$duration · 已同步到电脑", "$duration · Synced to computer") else Copy.t("$duration · 只在手机", "$duration · On this phone")
 }
 
 private fun edgeSpeedLabel(value: Float): String = when {
-    value < 0.45f -> "很慢"
-    value < 0.75f -> "慢"
-    value < 1.05f -> "标准"
-    value < 1.3f -> "快"
-    else -> "很快"
+    value < 0.45f -> Copy.t("很慢", "Very slow")
+    value < 0.75f -> Copy.t("慢", "Slow")
+    value < 1.05f -> Copy.t("标准", "Standard")
+    value < 1.3f -> Copy.t("快", "Fast")
+    else -> Copy.t("很快", "Very fast")
 }
 
 private fun speedLabel(value: Float): String = when {
-    value < 0.85f -> "慢"
-    value < 1.2f -> "标准"
-    value < 1.6f -> "快"
-    else -> "很快"
+    value < 0.85f -> Copy.t("慢", "Slow")
+    value < 1.2f -> Copy.t("标准", "Standard")
+    value < 1.6f -> Copy.t("快", "Fast")
+    else -> Copy.t("很快", "Very fast")
 }

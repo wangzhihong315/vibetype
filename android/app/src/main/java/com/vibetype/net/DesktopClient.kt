@@ -1,5 +1,6 @@
 package com.vibetype.net
 
+import com.vibetype.Copy
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -212,7 +213,7 @@ class DesktopClient(private val settings: PairingStore) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: PairingRequired) {
-                _state.value = ConnState.NeedsPairing(e.message ?: "需要重新配对")
+                _state.value = ConnState.NeedsPairing(e.message ?: Copy.t("需要重新配对", "Pair again"))
                 return
             } catch (e: ServerClosed) {
                 // 桌面端正常收起连接（空闲超时/重启），静默重连，不报错
@@ -300,10 +301,10 @@ class DesktopClient(private val settings: PairingStore) {
             "error" -> {
                 val code = json.optString("code", "error")
                 val message = when (code) {
-                    "bad_token" -> "配对码无效或已过期"
-                    "unsupported_version" -> "桌面端版本不兼容，请升级"
-                    "too_many_devices" -> "设备数量已满，请在电脑上移除旧设备"
-                    else -> json.optString("msg", "桌面端返回错误")
+                    "bad_token" -> Copy.t("配对码无效或已过期", "Invalid or expired pairing code")
+                    "unsupported_version" -> Copy.t("桌面端版本不兼容，请升级", "Desktop app version is incompatible. Please update.")
+                    "too_many_devices" -> Copy.t("设备数量已满，请在电脑上移除旧设备", "Device limit reached. Remove an old device on the computer.")
+                    else -> json.optString("msg", Copy.t("桌面端返回错误", "The desktop app returned an error"))
                 }
                 if (code == "bad_token") throw PairingRequired(message)
                 throw IOException(message)
@@ -340,15 +341,15 @@ class DesktopClient(private val settings: PairingStore) {
     }
 
     private fun humanize(e: Exception): String = when (e) {
-        is SocketTimeoutException -> "连接超时，确认电脑和手机在同一 Wi-Fi"
-        is ConnectException -> "连不上电脑，确认 VibeType 已打开"
-        else -> e.message ?: "连接失败"
+        is SocketTimeoutException -> Copy.t("连接超时，确认电脑和手机在同一 Wi-Fi", "Connection timed out. Make sure both devices are on the same Wi-Fi.")
+        is ConnectException -> Copy.t("连不上电脑，确认 VibeType 已打开", "Can't reach the computer. Make sure VibeType is running.")
+        else -> e.message ?: Copy.t("连接失败", "Connection failed")
     }
 
     private class PairingRequired(message: String) : Exception(message)
 
     /** 桌面端主动关连接，属于正常情况。 */
-    private class ServerClosed : Exception("桌面端断开了连接")
+    private class ServerClosed : Exception(Copy.t("桌面端断开了连接", "The desktop app disconnected"))
 
     companion object {
         private const val TAG = "DesktopClient"

@@ -1,8 +1,12 @@
 package com.vibetype.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,15 +42,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.vibetype.AckState
+import com.vibetype.Copy
 import com.vibetype.MainViewModel
 import com.vibetype.ModelState
+import com.vibetype.ThemeMode
 import com.vibetype.VibeBlue
+import com.vibetype.VibeCard
 import com.vibetype.VibeCoral
 import com.vibetype.VibeFaint
 import com.vibetype.VibeGreen
@@ -56,6 +66,7 @@ import com.vibetype.VibeTypeTheme
 import com.vibetype.Transcript
 import com.vibetype.net.ConnState
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 @Composable
 fun App(
@@ -72,6 +83,26 @@ fun App(
     val partial by vm.partial.collectAsState()
     val last by vm.last.collectAsState()
     val notice by vm.notice.collectAsState()
+    val language by vm.language.collectAsState()
+    val themeMode by vm.themeMode.collectAsState()
+    val systemDark = isSystemInDarkTheme()
+    val dark = when (themeMode) {
+        ThemeMode.Auto -> systemDark
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    val view = LocalView.current
+
+    LaunchedEffect(language) {
+        Copy.apply(language, systemChinese = Locale.getDefault().language.startsWith("zh"))
+    }
+    SideEffect {
+        val window = view.context.findActivity()?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
+    }
 
     LaunchedEffect(notice) {
         if (notice != null) {
@@ -80,7 +111,7 @@ fun App(
         }
     }
 
-    VibeTypeTheme {
+    VibeTypeTheme(dark = dark) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -103,6 +134,8 @@ fun App(
                     conn = conn,
                     initialHost = vm.settings.host ?: "",
                     initialPort = vm.settings.port.toString(),
+                    english = Copy.english,
+                    onToggleLanguage = vm::toggleLanguage,
                     onPair = vm::pair,
                 )
             }
@@ -160,13 +193,13 @@ private fun HomeScreen(
 
         Text(
             text = when {
-                recording -> "松开结束"
-                busy -> "转写中…"
-                model is ModelState.Missing -> "模型未安装"
-                model is ModelState.Loading -> "模型加载中…"
-                model is ModelState.Failed -> "模型加载失败"
-                !ready -> "按住说话"
-                else -> "按住说话"
+                recording -> Copy.t("松开结束", "Release to finish")
+                busy -> Copy.t("转写中…", "Transcribing…")
+                model is ModelState.Missing -> Copy.t("模型未安装", "Model not installed")
+                model is ModelState.Loading -> Copy.t("模型加载中…", "Loading model…")
+                model is ModelState.Failed -> Copy.t("模型加载失败", "Model failed to load")
+                !ready -> Copy.t("按住说话", "Hold to talk")
+                else -> Copy.t("按住说话", "Hold to talk")
             },
             fontSize = 20.sp,
             fontWeight = FontWeight.Medium,
@@ -222,15 +255,15 @@ private fun HomeScreen(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("X-ASR · 手机本地转写", fontSize = 12.sp, color = VibeFaint)
+            Text(Copy.t("X-ASR · 手机本地转写", "X-ASR · On-device transcription"), fontSize = 12.sp, color = VibeFaint)
             Spacer(Modifier.weight(1f))
             if (debuggable) {
                 TextButton(onClick = onSelfTest) {
-                    Text("自检", fontSize = 13.sp, color = VibeMuted)
+                    Text(Copy.t("自检", "Self-test"), fontSize = 13.sp, color = VibeMuted)
                 }
             }
             TextButton(onClick = onRepair) {
-                Text("换电脑", fontSize = 13.sp, color = VibeMuted)
+                Text(Copy.t("换电脑", "Change computer"), fontSize = 13.sp, color = VibeMuted)
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -238,34 +271,34 @@ private fun HomeScreen(
 }
 
 private fun subtitle(conn: ConnState, model: ModelState, micGranted: Boolean): String = when {
-    !micGranted -> "点一下按钮，允许使用麦克风"
+    !micGranted -> Copy.t("点一下按钮，允许使用麦克风", "Tap the button and allow microphone access")
     conn is ConnState.Failed -> conn.message
-    conn is ConnState.Connecting -> "正在连接电脑…"
+    conn is ConnState.Connecting -> Copy.t("正在连接电脑…", "Connecting to your computer…")
     conn is ConnState.Connected -> {
         val where = when (conn.platform) {
             "macos" -> "Mac"
             "windows" -> "Windows"
-            else -> "电脑"
+            else -> Copy.t("电脑", "Computer")
         }
-        "已连接 $where · 文字会打进当前光标"
+        Copy.t("已连接 $where · 文字会打进当前光标", "Connected to $where · Text goes to the cursor")
     }
-    model is ModelState.Missing -> "把模型放进手机后重启 App"
-    else -> "还没连上电脑"
+    model is ModelState.Missing -> Copy.t("把模型放进手机后重启 App", "Add the model to the phone, then restart the app")
+    else -> Copy.t("还没连上电脑", "Not connected yet")
 }
 
 @Composable
 private fun StatusPill(conn: ConnState) {
     val (color, label) = when (conn) {
-        ConnState.Idle -> VibeFaint to "未连接"
-        ConnState.Connecting -> VibeOrange to "连接中"
-        is ConnState.Connected -> VibeGreen to "已连接"
-        is ConnState.Failed -> VibeCoral to "未连接"
-        is ConnState.NeedsPairing -> VibeCoral to "未配对"
+        ConnState.Idle -> VibeFaint to Copy.t("未连接", "Not connected")
+        ConnState.Connecting -> VibeOrange to Copy.t("连接中", "Connecting…")
+        is ConnState.Connected -> VibeGreen to Copy.t("已连接", "Connected")
+        is ConnState.Failed -> VibeCoral to Copy.t("未连接", "Not connected")
+        is ConnState.NeedsPairing -> VibeCoral to Copy.t("未配对", "Not paired")
     }
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color.White)
+            .background(VibeCard)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -374,7 +407,7 @@ private fun TranscriptCard(transcript: Transcript, elapsed: String) {
             .fillMaxWidth()
             .shadow(10.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White)
+            .background(VibeCard)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
         Text(
@@ -390,15 +423,22 @@ private fun TranscriptCard(transcript: Transcript, elapsed: String) {
             Text(elapsed, fontSize = 11.sp, color = VibeFaint)
             if (transcript.corrected > 0) {
                 Spacer(Modifier.width(8.dp))
-                Text("已更正 ${transcript.corrected} 处", fontSize = 10.sp, color = VibeBlue)
+                Text(Copy.t("已更正 ${transcript.corrected} 处", "${transcript.corrected} corrected"), fontSize = 10.sp, color = VibeBlue)
             }
             Spacer(Modifier.weight(1f))
             val (label, color) = when (transcript.ack) {
-                AckState.Pending -> "发送中" to VibeMuted
-                AckState.Delivered -> "已上屏" to VibeGreen
-                AckState.Failed -> "未确认" to VibeOrange
+                AckState.Pending -> Copy.t("发送中", "Sending") to VibeMuted
+                AckState.Delivered -> Copy.t("已上屏", "Typed") to VibeGreen
+                AckState.Failed -> Copy.t("未确认", "No ack") to VibeOrange
             }
             Text(label, fontSize = 11.sp, color = color)
         }
     }
+}
+
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

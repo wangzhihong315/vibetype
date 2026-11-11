@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.roundToInt
 
 sealed interface ModelState {
@@ -102,6 +103,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _edgeScrollSpeed = MutableStateFlow(settings.edgeScrollSpeed)
     val edgeScrollSpeed: StateFlow<Float> = _edgeScrollSpeed.asStateFlow()
 
+    private val _language = MutableStateFlow(AppLanguage.fromId(settings.language))
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    private val _themeMode = MutableStateFlow(ThemeMode.fromId(settings.themeMode))
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
     private var asr: XAsr? = null
 
     /** debug 包才显示「自检」入口。 */
@@ -109,6 +116,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     init {
+        Copy.apply(_language.value, systemChinese = Locale.getDefault().language.startsWith("zh"))
         client.start()
         loadModel()
         viewModelScope.launch { capsuleStore.load() }
@@ -142,9 +150,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _model.value = ModelState.Ready
             } catch (e: OutOfMemoryError) {
-                _model.value = ModelState.Failed("内存不足，模型没加载起来")
+                _model.value = ModelState.Failed(Copy.t("内存不足，模型没加载起来", "Not enough memory to load the model"))
             } catch (e: Throwable) {
-                _model.value = ModelState.Failed(e.message ?: "模型加载失败")
+                _model.value = ModelState.Failed(e.message ?: Copy.t("模型加载失败", "Model failed to load"))
             }
         }
     }
@@ -156,7 +164,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _partial.value = ""
 
         val engine = asr ?: run {
-            _notice.value = "模型还没准备好"
+            _notice.value = Copy.t("模型还没准备好", "The model isn't ready yet")
             return
         }
         engine.start()
@@ -175,7 +183,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             recorder.onChunk = null
             engine.cancel()
-            _notice.value = "麦克风打不开，检查录音权限"
+            _notice.value = Copy.t("麦克风打不开，检查录音权限", "Can't open the microphone. Check recording permission.")
         }
     }
 
@@ -188,7 +196,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (pcm.size < minSamples) {
             asr?.cancel()
             _partial.value = ""
-            _notice.value = "说话时间太短"
+            _notice.value = Copy.t("说话时间太短", "That was too short")
             return
         }
         finishAndSend(pcm.size * 1000 / Recorder.SAMPLE_RATE)
@@ -210,7 +218,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun beginCapsule() {
         if (_recording.value || _capsuleRecording.value || _busy.value || _capsuleSaving.value) return
         if (_model.value !is ModelState.Ready) {
-            _notice.value = "模型还没准备好"
+            _notice.value = Copy.t("模型还没准备好", "The model isn't ready yet")
             return
         }
         _notice.value = null
@@ -226,7 +234,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             recorder.onChunk = null
             engine.cancel()
-            _notice.value = "麦克风打不开，检查录音权限"
+            _notice.value = Copy.t("麦克风打不开，检查录音权限", "Can't open the microphone. Check recording permission.")
         }
     }
 
@@ -239,7 +247,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (pcm.size < minSamples) {
             asr?.cancel()
             _capsulePartial.value = ""
-            _notice.value = "说话时间太短"
+            _notice.value = Copy.t("说话时间太短", "That was too short")
             return
         }
         saveCapsule(pcm.size * 1000 / Recorder.SAMPLE_RATE)
@@ -262,7 +270,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _capsulePartial.value = ""
             if (raw.isBlank()) {
                 _capsuleSaving.value = false
-                _notice.value = "没听清，再来一次"
+                _notice.value = Copy.t("没听清，再来一次", "Didn't catch that, try again")
                 return@launch
             }
             val text = corrector.correct(raw).text
@@ -303,16 +311,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** 把一条胶囊打进电脑光标，成功后标记为已同步。 */
     fun sendCapsuleToDesktop(capsule: Capsule) {
         if (client.state.value !is ConnState.Connected) {
-            _notice.value = "先连上电脑"
+            _notice.value = Copy.t("先连上电脑", "Connect to your computer first")
             return
         }
         viewModelScope.launch {
             val ok = client.sendText(capsule.text, 0, "zh")
             if (ok) {
                 capsuleStore.markSynced(capsule.id)
-                _notice.value = "已发到电脑光标"
+                _notice.value = Copy.t("已发到电脑光标", "Sent to the cursor")
             } else {
-                _notice.value = "没发出去，检查连接"
+                _notice.value = Copy.t("没发出去，检查连接", "Didn't send. Check the connection.")
             }
         }
     }
@@ -321,9 +329,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         val manager = app.getSystemService(android.content.ClipboardManager::class.java)
         manager?.setPrimaryClip(
-            android.content.ClipData.newPlainText("VibeType 胶囊", capsule.text)
+            android.content.ClipData.newPlainText(Copy.t("VibeType 胶囊", "VibeType Capsule"), capsule.text)
         )
-        _notice.value = "已复制"
+        _notice.value = Copy.t("已复制", "Copied")
     }
 
     /** 松手后补静音、取最终文本，走术语纠正再发送。 */
@@ -340,7 +348,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val elapsed = System.currentTimeMillis() - started
             _partial.value = ""
             if (raw.isBlank()) {
-                _notice.value = "没听清，再来一次"
+                _notice.value = Copy.t("没听清，再来一次", "Didn't catch that, try again")
                 _busy.value = false
                 return@launch
             }
@@ -369,11 +377,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 null
             }
             if (pcm == null || pcm.isEmpty()) {
-                _notice.value = "自检音频读取失败"
+                _notice.value = Copy.t("自检音频读取失败", "Couldn't read the self-test clip")
                 return@launch
             }
             val engine = asr ?: run {
-                _notice.value = "模型还没准备好"
+                _notice.value = Copy.t("模型还没准备好", "The model isn't ready yet")
                 return@launch
             }
 
@@ -402,14 +410,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val elapsed = System.currentTimeMillis() - started
             _partial.value = ""
             if (raw.isBlank()) {
-                _notice.value = "自检没听到内容"
+                _notice.value = Copy.t("自检没听到内容", "The self-test heard nothing")
                 _busy.value = false
                 return@launch
             }
             val corrected = corrector.correct(raw)
             _last.value = Transcript(corrected.text, elapsed, "zh", AckState.Pending, corrected.changes)
             val audioMs = pcm.size * 1000 / Recorder.SAMPLE_RATE
-            _notice.value = "自检 · 音频 %.1fs · 转写 %dms · RTF %.2f".format(
+            _notice.value = Copy.t("自检 · 音频 %.1fs · 转写 %dms · RTF %.2f", "Self-test · audio %.1fs · ASR %dms · RTF %.2f").format(
                 audioMs / 1000.0, elapsed, elapsed.toDouble() / audioMs
             )
             _busy.value = false
@@ -472,6 +480,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _edgeScrollSpeed.value = clamped
     }
 
+
+    fun setLanguage(value: AppLanguage) {
+        settings.language = value.id
+        _language.value = value
+        Copy.apply(value, systemChinese = Locale.getDefault().language.startsWith("zh"))
+    }
+
+    fun setThemeMode(value: ThemeMode) {
+        settings.themeMode = value.id
+        _themeMode.value = value
+    }
+
+    /** 配对页那个「中文 / English」小按钮，直接切到另一种语言。 */
+    fun toggleLanguage() {
+        setLanguage(if (Copy.english) AppLanguage.Chinese else AppLanguage.English)
+    }
+
     fun setNaturalScroll(value: Boolean) {
         settings.naturalScroll = value
         _naturalScroll.value = value
@@ -487,7 +512,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _last.value = _last.value?.copy(
                 ack = if (ok) AckState.Delivered else AckState.Failed
             )
-            if (!ok) _notice.value = "还是没发出去"
+            if (!ok) _notice.value = Copy.t("还是没发出去", "Still didn't send")
         }
     }
 

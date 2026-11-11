@@ -56,6 +56,16 @@ class PairingStore(context: Context) {
         get() = prefs.getBoolean("naturalScroll", true)
         set(value) = prefs.edit().putBoolean("naturalScroll", value).apply()
 
+    /** 界面语言：auto / zh / en。 */
+    var language: String
+        get() = prefs.getString("language", "auto") ?: "auto"
+        set(value) = prefs.edit().putString("language", value).apply()
+
+    /** 外观：auto / light / dark。 */
+    var themeMode: String
+        get() = prefs.getString("themeMode", "auto") ?: "auto"
+        set(value) = prefs.edit().putString("themeMode", value).apply()
+
     val paired: Boolean
         get() = !host.isNullOrBlank() && !token.isNullOrBlank()
 
@@ -67,7 +77,14 @@ class PairingStore(context: Context) {
             .apply()
     }
 
+    /** 解除配对只清配对信息，语言、外观、手势这些偏好要留着。 */
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove("host")
+            .remove("port")
+            .remove("token")
+            .remove("deviceToken")
+            .remove("desktopName")
+            .apply()
     }
 }

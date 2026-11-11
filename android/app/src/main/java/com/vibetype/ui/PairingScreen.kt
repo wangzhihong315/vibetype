@@ -49,6 +49,8 @@ fun PairingScreen(
     conn: ConnState,
     initialHost: String = "",
     initialPort: String = "47823",
+    english: Boolean = false,
+    onToggleLanguage: () -> Unit = {},
     onPair: (String, Int, String) -> Unit,
 ) {
     var host by rememberSaveable { mutableStateOf(initialHost) }
@@ -56,19 +58,7 @@ fun PairingScreen(
     var code by rememberSaveable { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
 
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("vibetype.pairing", android.content.Context.MODE_PRIVATE) }
-    var english by remember {
-        mutableStateOf(
-            prefs.getString("lang", null)?.let { it == "en" }
-                ?: (java.util.Locale.getDefault().language != "zh")
-        )
-    }
     val copy = pairingCopy(english)
-    fun toggleLanguage() {
-        english = !english
-        prefs.edit().putString("lang", if (english) "en" else "zh").apply()
-    }
 
     val connecting = conn is ConnState.Connecting
     val error = localError
@@ -86,7 +76,7 @@ fun PairingScreen(
     ) {
         Spacer(Modifier.height(40.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { toggleLanguage() }) {
+            TextButton(onClick = onToggleLanguage) {
                 Text(if (english) "中文" else "English", fontSize = 13.sp, color = VibeBlue)
             }
         }
