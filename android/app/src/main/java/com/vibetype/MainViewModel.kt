@@ -76,6 +76,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             client.state.collect { state ->
                 if (state is ConnState.NeedsPairing) {
+                    // token 已经失效，清掉；地址留着，配对页还能直接带出来
+                    settings.token = null
                     _paired.value = false
                 }
             }
