@@ -10,7 +10,15 @@ type Device = {
   last_seen: number;
   online: boolean;
 };
-type KeySlot = { id: string; label: string; key: string; modifiers: string[] };
+type KeySlot = {
+  id: string;
+  label: string;
+  action: string;
+  key: string;
+  modifiers: string[];
+  target: string;
+};
+type AppEntry = { name: string; path: string };
 type Capsule = {
   id: string;
   text: string;
@@ -257,10 +265,12 @@ export default function App() {
   const [clientId, setClientId] = useState("claude");
   const [keyDraft, setKeyDraft] = useState<KeySlot[]>([]);
   const [keyDirty, setKeyDirty] = useState(false);
+  const [appList, setAppList] = useState<AppEntry[]>([]);
 
   useEffect(() => {
     invoke<UiState>("ui_state").then(setState).catch(console.error);
     invoke<boolean>("autostart_enabled").then(setAutostart).catch(() => {});
+    invoke<AppEntry[]>("list_apps").then(setAppList).catch(() => {});
     const unlisten = listen<UiState>("state", (event) => setState(event.payload));
     // MCP 在另一个进程里写胶囊，隔几秒把文件读回来一次
     const timer = window.setInterval(() => {
@@ -966,34 +976,67 @@ export default function App() {
                     <input
                       className="key-label"
                       value={slot.label}
-                      maxLength={8}
+                      maxLength={12}
                       onChange={(event) => patchKey(index, { label: event.target.value })}
                     />
                     <select
-                      className="key-select"
-                      value={slot.key}
-                      onChange={(event) => patchKey(index, { key: event.target.value })}
+                      className="key-kind"
+                      value={slot.action}
+                      onChange={(event) =>
+                        patchKey(index, { action: event.target.value })
+                      }
                     >
-                      {KEY_OPTIONS.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
+                      <option value="key">按键</option>
+                      <option value="app">打开应用</option>
                     </select>
-                    <div className="mods">
-                      {modifiersFor(state.platform).map(([id, symbol]) => (
-                        <button
-                          key={id}
-                          className={slot.modifiers.includes(id) ? "mod on" : "mod"}
-                          onClick={() => toggleModifier(index, id)}
+
+                    {slot.action === "app" ? (
+                      <input
+                        className="key-app"
+                        list="vibetype-apps"
+                        placeholder="选一个应用，或输入名字"
+                        value={slot.target}
+                        onChange={(event) =>
+                          patchKey(index, { target: event.target.value })
+                        }
+                      />
+                    ) : (
+                      <>
+                        <select
+                          className="key-select"
+                          value={slot.key}
+                          onChange={(event) =>
+                            patchKey(index, { key: event.target.value })
+                          }
                         >
-                          {symbol}
-                        </button>
-                      ))}
-                    </div>
+                          {KEY_OPTIONS.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="mods">
+                          {modifiersFor(state.platform).map(([id, symbol]) => (
+                            <button
+                              key={id}
+                              className={slot.modifiers.includes(id) ? "mod on" : "mod"}
+                              onClick={() => toggleModifier(index, id)}
+                            >
+                              {symbol}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
+
+              <datalist id="vibetype-apps">
+                {appList.map((app) => (
+                  <option key={app.path} value={app.name} />
+                ))}
+              </datalist>
 
               <button
                 className={keyDirty ? "quick primary save-keys" : "quick save-keys"}
@@ -1004,8 +1047,8 @@ export default function App() {
               </button>
               <p className="hint">
                 「切换」默认 {state.platform === "windows" ? "Alt+Tab" : "⌘Tab"}，
-                「自定义」默认 {state.platform === "windows" ? "Win+Tab" : "⌃↑"}；
-                手机上显示的是标签。
+                「自定义」默认 {state.platform === "windows" ? "Win+Tab" : "⌃↑"}。
+                选「打开应用」后，没开就启动、开着就切到最前；手机上显示的是标签。
               </p>
             </div>
 

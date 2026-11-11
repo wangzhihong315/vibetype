@@ -76,11 +76,11 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 
 ```json
 {"t":"welcome","v":1,"keys":[
-  {"id":"k1","label":"回车","key":"enter","modifiers":[]},
-  {"id":"k2","label":"删除","key":"backspace","modifiers":[]},
-  {"id":"k3","label":"esc","key":"escape","modifiers":[]},
-  {"id":"k4","label":"切换","key":"tab","modifiers":["cmd"]},
-  {"id":"k5","label":"自定义","key":"up","modifiers":["ctrl"]}
+  {"id":"k1","label":"回车","action":"key","key":"enter","modifiers":[]},
+  {"id":"k2","label":"删除","action":"key","key":"backspace","modifiers":[]},
+  {"id":"k3","label":"esc","action":"key","key":"escape","modifiers":[]},
+  {"id":"k4","label":"切换","action":"key","key":"tab","modifiers":["cmd"]},
+  {"id":"k5","label":"WB","action":"app","target":"WorkBuddy"}
 ]}
 ```
 
@@ -97,6 +97,7 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 ```
 
 `key` 的取值：`enter` / `tab` / `space` / `escape` / `backspace` / `delete` / `up` / `down` / `left` / `right` / `pageup` / `pagedown` / `home` / `end`。
+`action`：`key` 按键，或者 `app` 打开/激活一个应用（`target` 是应用名、bundle id、exe 路径或 .lnk）。
 `modifiers`：macOS 用 `cmd` / `ctrl` / `alt` / `shift`，Windows 用 `ctrl` / `alt` / `shift` / `meta`。
 老版本会发 `enter` / `delete` / `esc` / `switch` / `custom` 这些别名，桌面端按 k1–k5 兼容。
 

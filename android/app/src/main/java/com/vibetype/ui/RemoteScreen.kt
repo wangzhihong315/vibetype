@@ -1039,7 +1039,12 @@ private fun KeyButton(
     ) {
         Text(
             text = label,
-            fontSize = if (label.length > 2) 11.sp else 12.sp,
+            fontSize = when {
+                label.length > 6 -> 9.sp
+                label.length > 4 -> 10.sp
+                label.length > 2 -> 11.sp
+                else -> 12.sp
+            },
             color = if (enabled) VibeInk else VibeFaint,
         )
     }

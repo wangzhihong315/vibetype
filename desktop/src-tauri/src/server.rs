@@ -239,7 +239,11 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
                 eprintln!("key frame: {}", frame.name);
                 if let Some(slot) = state.resolve_key(&frame.name) {
                     let _ = tokio::task::spawn_blocking(move || {
-                        inject::press_combo(&slot.key, &slot.modifiers);
+                        if slot.action == "app" {
+                            inject::launch_app(&slot.target);
+                        } else {
+                            inject::press_combo(&slot.key, &slot.modifiers);
+                        }
                     })
                     .await;
                 }

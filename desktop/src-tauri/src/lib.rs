@@ -55,6 +55,104 @@ fn refresh_capsules(state: tauri::State<'_, state::AppState>) -> state::UiState 
     state.snapshot()
 }
 
+#[derive(serde::Serialize)]
+struct AppEntry {
+    name: String,
+    path: String,
+}
+
+/// 列出现已安装的 App，给「打开应用」选目标用。
+#[tauri::command]
+fn list_apps() -> Vec<AppEntry> {
+    let mut found = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut roots: Vec<std::path::PathBuf> = vec![
+            "/Applications".into(),
+            "/System/Applications".into(),
+        ];
+        if let Some(home) = std::env::var_os("HOME") {
+            roots.push(std::path::PathBuf::from(home).join("Applications"));
+        }
+        for root in roots {
+            let Ok(entries) = std::fs::read_dir(&root) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|ext| ext.to_str()) != Some("app") {
+                    continue;
+                }
+                let Some(name) = path.file_stem().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                found.push(AppEntry {
+                    name: name.to_string(),
+                    path: path.to_string_lossy().to_string(),
+                });
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut roots = Vec::new();
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            roots.push(
+                std::path::PathBuf::from(appdata)
+                    .join("Microsoft")
+                    .join("Windows")
+                    .join("Start Menu")
+                    .join("Programs"),
+            );
+        }
+        if let Ok(program_data) = std::env::var("ProgramData") {
+            roots.push(
+                std::path::PathBuf::from(program_data)
+                    .join("Microsoft")
+                    .join("Windows")
+                    .join("Start Menu")
+                    .join("Programs"),
+            );
+        }
+        for root in roots {
+            collect_shortcuts(&root, 0, &mut found);
+        }
+    }
+
+    found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    found.dedup_by(|a, b| a.name == b.name);
+    found
+}
+
+#[cfg(target_os = "windows")]
+fn collect_shortcuts(dir: &std::path::Path, depth: u8, out: &mut Vec<AppEntry>) {
+    if depth > 4 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_shortcuts(&path, depth + 1, out);
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()).and_then(|ext| Some(ext.eq_ignore_ascii_case("lnk"))) != Some(true) {
+            continue;
+        }
+        let Some(name) = path.file_stem().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        out.push(AppEntry {
+            name: name.to_string(),
+            path: path.to_string_lossy().to_string(),
+        });
+    }
+}
+
 #[tauri::command]
 fn set_keymap(
     state: tauri::State<'_, state::AppState>,
@@ -208,6 +306,7 @@ pub fn run() {
             install_skill,
             set_keymap,
             reset_keymap,
+            list_apps,
             set_mcp_keys,
             autostart_enabled,
             set_autostart,

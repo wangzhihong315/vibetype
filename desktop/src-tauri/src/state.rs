@@ -38,9 +38,20 @@ impl Entry {
 pub struct KeySlot {
     pub id: String,
     pub label: String,
+    /// key = 按键；app = 打开/激活一个应用
+    #[serde(default = "default_action")]
+    pub action: String,
+    #[serde(default)]
     pub key: String,
     #[serde(default)]
     pub modifiers: Vec<String>,
+    /// action = app 时的应用名（macOS 用 .app 名字，Windows 用路径或名称）
+    #[serde(default)]
+    pub target: String,
+}
+
+fn default_action() -> String {
+    "key".into()
 }
 
 #[derive(Clone, Serialize)]
@@ -482,14 +493,25 @@ fn valid_keymap(slots: &[KeySlot]) -> bool {
         if slot.id != format!("k{}", index + 1) {
             return false;
         }
-        if slot.label.trim().is_empty() || slot.label.chars().count() > 8 {
+        if slot.label.trim().is_empty() || slot.label.chars().count() > 12 {
             return false;
         }
-        if !KEYS.contains(&slot.key.as_str()) {
-            return false;
-        }
-        if slot.modifiers.iter().any(|m| !allowed_mods.contains(&m.as_str())) {
-            return false;
+        match slot.action.as_str() {
+            "app" => {
+                let target = slot.target.trim();
+                if target.is_empty() || target.chars().count() > 200 {
+                    return false;
+                }
+            }
+            "key" => {
+                if !KEYS.contains(&slot.key.as_str()) {
+                    return false;
+                }
+                if slot.modifiers.iter().any(|m| !allowed_mods.contains(&m.as_str())) {
+                    return false;
+                }
+            }
+            _ => return false,
         }
     }
     true
@@ -512,32 +534,42 @@ pub fn default_keymap() -> Vec<KeySlot> {
         KeySlot {
             id: "k1".into(),
             label: "回车".into(),
+            action: "key".into(),
             key: "enter".into(),
             modifiers: vec![],
+            target: String::new(),
         },
         KeySlot {
             id: "k2".into(),
             label: "删除".into(),
+            action: "key".into(),
             key: "backspace".into(),
             modifiers: vec![],
+            target: String::new(),
         },
         KeySlot {
             id: "k3".into(),
             label: "esc".into(),
+            action: "key".into(),
             key: "escape".into(),
             modifiers: vec![],
+            target: String::new(),
         },
         KeySlot {
             id: "k4".into(),
             label: "切换".into(),
+            action: "key".into(),
             key: "tab".into(),
             modifiers: switch_mods,
+            target: String::new(),
         },
         KeySlot {
             id: "k5".into(),
             label: "自定义".into(),
+            action: "key".into(),
             key: custom_key.into(),
             modifiers: custom_mods,
+            target: String::new(),
         },
     ]
 }

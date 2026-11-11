@@ -400,3 +400,201 @@ pub fn open_settings() {
             .spawn();
     }
 }
+
+/// 打开或激活一个应用：没开就启动，开着就提到最前。
+///
+/// macOS 交给 LaunchServices；Windows 先按进程名找已运行实例，
+/// 找到就直接激活窗口，找不到再启动。
+pub fn launch_app(target: &str) -> bool {
+    let target = target.trim();
+    if target.is_empty() {
+        return false;
+    }
+    platform_launch(target)
+}
+
+#[cfg(target_os = "macos")]
+fn platform_launch(target: &str) -> bool {
+    // open -a 会先看已经运行的实例，有就激活，没有才启动。
+    let by_name = std::process::Command::new("open")
+        .args(["-a", target])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    if by_name {
+        return true;
+    }
+    // 也接受 bundle id 和 .app 路径
+    for args in [["-b", target], ["", target]] {
+        let mut command = std::process::Command::new("open");
+        if !args[0].is_empty() {
+            command.arg(args[0]);
+        }
+        let ok = command
+            .arg(args[1])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if ok {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(target_os = "windows")]
+fn platform_launch(target: &str) -> bool {
+    let lower = target.to_lowercase();
+    let shell_target = lower.ends_with(".lnk")
+        || lower.ends_with(".url")
+        || lower.starts_with("shell:")
+        || lower.starts_with("http");
+    if shell_target {
+        let ok = std::process::Command::new("cmd")
+            .args(["/C", "start", "", target])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if ok {
+            let stem = std::path::Path::new(target)
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or(target);
+            focus_process(stem);
+        }
+        return ok;
+    }
+
+    if let Some(exe) = resolve_exe(target) {
+        let stem = std::path::Path::new(&exe)
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .map(|name| name.to_string())
+            .unwrap_or_else(|| exe.clone());
+        if focus_process(&stem) {
+            return true;
+        }
+        return std::process::Command::new(&exe).spawn().is_ok();
+    }
+
+    // 退回 shell：PATH 里的命令、协议都能解析
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", target])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_exe(target: &str) -> Option<String> {
+    let path = std::path::Path::new(target);
+    if path.is_file() {
+        return Some(target.to_string());
+    }
+    let with_ext = if target.to_lowercase().ends_with(".exe") {
+        target.to_string()
+    } else {
+        format!("{target}.exe")
+    };
+    if std::path::Path::new(&with_ext).is_file() {
+        return Some(with_ext);
+    }
+    if target.contains('\\') || target.contains('/') {
+        return None;
+    }
+    let path_var = std::env::var("PATH").ok()?;
+    for dir in path_var.split(';') {
+        let candidate = std::path::Path::new(dir).join(&with_ext);
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn focus_process(stem: &str) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow, ShowWindow,
+        SwitchToThisWindow, SW_RESTORE,
+    };
+
+    fn name_of(entry: &PROCESSENTRY32W) -> String {
+        let len = entry
+            .szExeFile
+            .iter()
+            .position(|c| *c == 0)
+            .unwrap_or(entry.szExeFile.len());
+        String::from_utf16_lossy(&entry.szExeFile[..len])
+    }
+
+    unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> windows_sys::Win32::Foundation::BOOL {
+        let ctx = &mut *(lparam as *mut FocusCtx);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid != ctx.pid || IsWindowVisible(hwnd) == 0 {
+            return 1;
+        }
+        ShowWindow(hwnd, SW_RESTORE);
+        if SetForegroundWindow(hwnd) == 0 {
+            SwitchToThisWindow(hwnd, 1);
+        }
+        ctx.done = true;
+        0
+    }
+
+    struct FocusCtx {
+        pid: u32,
+        done: bool,
+    }
+
+    let desired = if stem.to_lowercase().ends_with(".exe") {
+        stem.to_lowercase()
+    } else {
+        format!("{}.exe", stem.to_lowercase())
+    };
+
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == 0 || snapshot == -1 {
+            return false;
+        }
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut pid = 0u32;
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                if name_of(&entry).to_lowercase() == desired {
+                    pid = entry.th32ProcessID;
+                    break;
+                }
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+        CloseHandle(snapshot);
+        if pid == 0 {
+            return false;
+        }
+        let mut ctx = FocusCtx { pid, done: false };
+        EnumWindows(Some(callback), &mut ctx as *mut FocusCtx as LPARAM);
+        ctx.done
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
+fn wide(value: &str) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+    std::ffi::OsStr::new(value)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
+}

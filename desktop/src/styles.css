@@ -1083,3 +1083,28 @@ button.cmd .link {
   opacity: 0.55;
   cursor: default;
 }
+
+.key-kind {
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12px;
+  padding: 0 6px;
+  font-family: inherit;
+  flex: 0 0 auto;
+}
+
+.key-app {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 12px;
+  padding: 0 8px;
+  font-family: inherit;
+}
