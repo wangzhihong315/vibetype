@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use enigo::{Axis, Button, Coordinate, Direction, Enigo, Mouse, Settings};
 #[cfg(not(target_os = "macos"))]
-use enigo::Key;
+use enigo::{Key, Keyboard};
 
 /// macOS 需要「辅助功能」授权才能把按键投递给别的 App。
 #[cfg(target_os = "macos")]
