@@ -234,12 +234,16 @@ class DesktopClient(private val settings: PairingStore) {
             } catch (e: ServerClosed) {
                 // 桌面端正常收起连接（空闲超时/重启），静默重连，不报错
                 _state.value = ConnState.Connecting
+                backoff = 1_000L
                 delay(300)
             } catch (e: Exception) {
                 // restart() 会取消旧 loop 并关掉旧 socket；旧 loop 的 readLine
                 // 会抛 SocketException，但这不代表新连接失败。
                 if (!coroutineContext.isActive) break
+                // 成功连过之后再掉线，退避要归零，不能沿用之前的指数值
+                val wasConnected = _state.value is ConnState.Connected
                 _state.value = ConnState.Failed(humanize(e))
+                if (wasConnected) backoff = 1_000L
                 // 地址可能随网络变了：先在同一网段广播找一次，找到就立刻重试。
                 if (maybeDiscover()) {
                     backoff = 1_000L
@@ -275,6 +279,9 @@ class DesktopClient(private val settings: PairingStore) {
             // 重启时旧连接可能在这之后才连上；别把已经过期的连接写进共享状态。
             coroutineContext.ensureActive()
             s.tcpNoDelay = true
+            // 桌面端 20 秒回一次 pong；45 秒没有任何数据就当作半开连接，
+            // 否则换网/对端消失时界面会一直停在“已连接”。
+            s.soTimeout = 45_000
             socket = s
 
             val out = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))

@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -32,7 +34,11 @@ class CapsuleStore(context: Context) {
     private val _items = MutableStateFlow<List<Capsule>>(emptyList())
     val items: StateFlow<List<Capsule>> = _items.asStateFlow()
 
+    /** 同步收尾时会并发调用 markSynced；所有写入串行化，避免互相覆盖。 */
+    private val mutex = Mutex()
+
     suspend fun load() = withContext(Dispatchers.IO) {
+        mutex.withLock {
         if (!file.exists()) return@withContext
         val parsed = try {
             JSONArray(file.readText())
@@ -54,9 +60,11 @@ class CapsuleStore(context: Context) {
             )
         }
         _items.value = list.sortedByDescending { it.createdAt }
+        }
     }
 
     suspend fun add(text: String, durationMs: Int): Capsule = withContext(Dispatchers.IO) {
+        mutex.withLock {
         val trimmed = text.trim()
         val capsule = Capsule(
             id = UUID.randomUUID().toString(),
@@ -68,25 +76,32 @@ class CapsuleStore(context: Context) {
         _items.value = (listOf(capsule) + _items.value).sortedByDescending { it.createdAt }
         persist()
         capsule
+        }
     }
 
     suspend fun updateText(id: String, text: String) = withContext(Dispatchers.IO) {
-        _items.value = _items.value.map {
-            if (it.id == id) it.copy(text = text.trim()) else it
+        mutex.withLock {
+            _items.value = _items.value.map {
+                if (it.id == id) it.copy(text = text.trim()) else it
+            }
+            persist()
         }
-        persist()
     }
 
     suspend fun markSynced(id: String) = withContext(Dispatchers.IO) {
-        _items.value = _items.value.map {
-            if (it.id == id) it.copy(synced = true) else it
+        mutex.withLock {
+            _items.value = _items.value.map {
+                if (it.id == id) it.copy(synced = true) else it
+            }
+            persist()
         }
-        persist()
     }
 
     suspend fun remove(id: String) = withContext(Dispatchers.IO) {
-        _items.value = _items.value.filterNot { it.id == id }
-        persist()
+        mutex.withLock {
+            _items.value = _items.value.filterNot { it.id == id }
+            persist()
+        }
     }
 
     private fun persist() {
