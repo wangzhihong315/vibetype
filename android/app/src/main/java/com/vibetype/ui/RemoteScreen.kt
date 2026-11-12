@@ -710,7 +710,7 @@ private fun DisconnectedOverlay(
                     .clickable(onClick = onReconnect),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(Copy.t("自动查找电脑", "Find my computer"), fontSize = 13.sp, color = VibeInk)
+                Text(Copy.t("自动查找电脑", "Find my computer"), fontSize = 13.sp, color = Color(0xFF1D1D1F))
             }
             Spacer(Modifier.height(8.dp))
             Box(
@@ -1733,7 +1733,7 @@ private fun SettingsSheet(
             }
 
             Spacer(Modifier.height(22.dp))
-            Text("VibeType 0.1.0 · X-ASR", fontSize = 11.sp, color = VibeFaint)
+            Text("VibeType 0.2.0 · X-ASR", fontSize = 11.sp, color = VibeFaint)
         }
     }
 }

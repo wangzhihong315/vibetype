@@ -435,7 +435,7 @@ export default function App() {
               {state.permission ? t("上屏权限已授权", "Typing permission granted") : t("缺上屏权限", "Typing permission missing")}
             </span>
           </div>
-          <span className="ver">v0.1.0</span>
+          <span className="ver">v0.2.0</span>
         </div>
       </aside>
 
@@ -1059,7 +1059,7 @@ export default function App() {
             </div>
 
             <p className="hint">
-              {t("VibeType 0.1.0 · 手机本地转写（X-ASR）· 这里只收文字和胶囊。", "VibeType 0.1.0 · On-device transcription (X-ASR) · Only text and capsules arrive here.")}
+              {t("VibeType 0.2.0 · 手机本地转写（X-ASR）· 这里只收文字和胶囊。", "VibeType 0.2.0 · On-device transcription (X-ASR) · Only text and capsules arrive here.")}
             </p>
           </section>
         )}

@@ -47,7 +47,7 @@ vibetype/
 
 ## Status
 
-v0.1 in development: hold to talk → local transcription → type on the desktop.
+v0.2: hold to talk → local transcription → type on the desktop. First public release; see [`docs/releases/0.2.0.md`](docs/releases/0.2.0.md).
 
 - [x] Project skeleton and protocol
 - [x] Android: recording, X-ASR streaming + hotwords + term correction, pairing, sending
@@ -63,7 +63,7 @@ v0.1 in development: hold to talk → local transcription → type on the deskto
 - [x] Desktop console (Overview / Connect / Devices / Capsules / MCP / Settings)
 - [x] MCP: `vibetype --mcp` exposes a stdio server around capsules — list unprocessed → digest → mark processed — with a Skill, Prompt and Resource
 - [x] Real device (K80) self-test: 4.8 s transcribed in 116 ms, RTF 0.02; live typing and capsule sync verified
-- [ ] English term recognition (JSON heard as “J song”)
+- [x] English and coding/AI terms: 144 hotwords + 171 aliases + 182 casing rules (JSON, Node.js, GitHub Actions, Claude Code, …)
 - [x] First-run onboarding, gesture playground, trackpad speed and edge-scroll settings
 - [x] Chinese/English UI on both phone and desktop, plus dark mode (follow system or manual)
 - [x] Automatic desktop discovery after an office/Wi-Fi change (UDP broadcast); manual address entry without re-pairing

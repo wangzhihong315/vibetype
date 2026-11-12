@@ -409,6 +409,6 @@ class DesktopClient(private val settings: PairingStore) {
     companion object {
         private const val TAG = "DesktopClient"
         const val PROTOCOL_VERSION = 1
-        const val APP_VERSION = "0.1.0"
+        const val APP_VERSION = "0.2.0"
     }
 }

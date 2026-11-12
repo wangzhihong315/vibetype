@@ -144,7 +144,7 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
     let welcome = json!({
         "t": "welcome",
         "v": PROTOCOL_VERSION,
-        "server": "vibetype/0.1.0",
+        "server": "vibetype/0.2.0",
         "platform": std::env::consts::OS,
         "inject": state.injection(),
         "deviceToken": issued.unwrap_or_default(),

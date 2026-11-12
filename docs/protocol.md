@@ -40,13 +40,13 @@ VIBETYPE_DISCOVER
 手机 → 桌面：
 
 ```json
-{"t":"hello","v":1,"token":"<配对码 或 deviceToken>","device":{"name":"Redmi K80","platform":"android","app":"0.1.0"}}
+{"t":"hello","v":1,"token":"<配对码 或 deviceToken>","device":{"name":"Redmi K80","platform":"android","app":"0.2.0"}}
 ```
 
 桌面 → 手机（成功）：
 
 ```json
-{"t":"welcome","v":1,"server":"vibetype/0.1.0","platform":"macos","inject":"type","deviceToken":"<32 hex，仅首次配对时出现>","desktopId":"d7906fbc66dba52b"}
+{"t":"welcome","v":1,"server":"vibetype/0.2.0","platform":"macos","inject":"type","deviceToken":"<32 hex，仅首次配对时出现>","desktopId":"d7906fbc66dba52b"}
 ```
 
 桌面 → 手机（失败，随后断开）：
