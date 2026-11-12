@@ -490,6 +490,9 @@ button {
   height: 132px;
   flex: 0 0 132px;
   align-self: center;
+  /* 二维码必须始终是白底黑块，深色模式下也要能扫 */
+  background: #fff;
+  border-radius: 12px;
 }
 
 .qr svg {

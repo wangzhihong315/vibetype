@@ -563,8 +563,8 @@ export default function App() {
               <div className="step">
                 <span className="badge">2</span>
                 <div>
-                  <b>{t("用手机相机扫上面的码", "Scan the code with your phone camera")}</b>
-                  <span>{t("也可以在 App 里手输地址和六位码", "Or enter the address and 6-digit code in the app")}</span>
+                  <b>{t("在手机 App 里扫上面的码", "Scan it in the phone app")}</b>
+                  <span>{t("点「扫电脑上的二维码」，或手动输入地址和六位码", "Tap Scan QR code, or enter the address and code manually")}</span>
                 </div>
               </div>
               <div className="step">
