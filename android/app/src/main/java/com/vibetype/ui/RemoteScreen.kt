@@ -10,6 +10,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -65,6 +67,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
@@ -78,12 +81,14 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -95,6 +100,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibetype.AckState
+import com.vibetype.R
 import com.vibetype.AppLanguage
 import com.vibetype.Copy
 import com.vibetype.ThemeMode
@@ -103,6 +109,7 @@ import com.vibetype.ModelState
 import com.vibetype.Transcript
 import com.vibetype.VibeBlue
 import com.vibetype.VibeCard
+import com.vibetype.VibeCapsuleBorder
 import com.vibetype.VibeCapsuleIdleBottom
 import com.vibetype.VibeCapsuleIdleTop
 import com.vibetype.VibeCapsulePressed
@@ -1061,8 +1068,8 @@ private fun DockKeys(
  * 胶囊键：轻点开列表，按住录一条。
  * 按下先等 240ms 再开麦克风，避免轻点时白录一段。
  *
- * 键上只放图形，不放文字：竖向胶囊 + 灵感星点。
- * 按住时胶囊从下往上灌满，灌满即开录；录音时变成跳动的声波。
+ * 键上只放图形，不放文字：原版的单粒红药丸，3D 渲染、透明背景。
+ * 按住 240ms 开录；录音时换成白色横胶囊 + 跳动的声波。
  */
 @Composable
 private fun CapsuleKey(
@@ -1102,18 +1109,6 @@ private fun CapsuleKey(
         }
     }
 
-    val tint = when {
-        recording -> VibeCoral
-        pressed -> VibeCapsulePressed
-        enabled -> VibeCapsuleTintTop
-        else -> VibeCapsuleIdleTop
-    }
-    val glyph = when {
-        recording -> Color.White
-        enabled -> VibeCoral
-        else -> VibeFaint.copy(alpha = 0.6f)
-    }
-
     Box(
         modifier
             .height(52.dp)
@@ -1122,6 +1117,8 @@ private fun CapsuleKey(
             .background(
                 if (recording) {
                     Brush.linearGradient(listOf(VibeCoral, VibeCoral))
+                } else if (pressed) {
+                    Brush.verticalGradient(listOf(VibeCapsulePressed, VibeCapsulePressed))
                 } else if (enabled) {
                     Brush.verticalGradient(listOf(VibeCapsuleTintTop, VibeCapsuleTintBottom))
                 } else {
@@ -1134,7 +1131,7 @@ private fun CapsuleKey(
                 } else {
                     Modifier.border(
                         width = 1.dp,
-                        color = if (enabled) VibeCoral.copy(alpha = 0.16f) else Color.Transparent,
+                        color = if (enabled) VibeCapsuleBorder else Color.Transparent,
                         shape = RoundedCornerShape(14.dp),
                     )
                 }
@@ -1167,14 +1164,44 @@ private fun CapsuleKey(
             },
         contentAlignment = Alignment.Center,
     ) {
-        CapsuleGlyph(
-            fill = glyph,
-            cutout = tint,
-            progress = hold.value,
-            recording = recording,
-            wave = wavePhase,
-            modifier = Modifier.size(26.dp, 33.dp),
-        )
+        if (recording) {
+            // 录音态：白色横胶囊 + 三根珊瑚色声波
+            CapsuleGlyph(
+                fill = Color.White,
+                cutout = VibeCoral,
+                progress = 0f,
+                recording = true,
+                wave = wavePhase,
+                modifier = Modifier.size(66.dp, 34.dp),
+            )
+        } else {
+            Box(contentAlignment = Alignment.Center) {
+                // 3D 图标落地的软阴影；深浅色都能用
+                Canvas(
+                    Modifier
+                        .width(64.dp)
+                        .height(12.dp)
+                        .offset(y = 15.dp)
+                ) {
+                    drawOval(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.Black.copy(alpha = 0.13f), Color.Transparent),
+                            center = Offset(size.width / 2f, size.height / 2f),
+                            radius = size.width / 2f,
+                        ),
+                    )
+                }
+                Image(
+                    painter = painterResource(R.drawable.capsule_key),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .width(72.dp)
+                        .height(36.dp)
+                        .alpha(if (enabled) 1f else 0.4f),
+                )
+            }
+        }
 
         // 还没同步到电脑的条数
         if (pending > 0 && !recording) {
@@ -1195,6 +1222,17 @@ private fun CapsuleKey(
                     color = Color.White,
                 )
             }
+        }
+
+        // 按住 240ms 的开麦进度
+        if (pressed && !recording) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth(hold.value)
+                    .height(3.dp)
+                    .background(VibeCoral)
+            )
         }
     }
 }
@@ -1223,12 +1261,12 @@ private fun CapsuleGlyph(
 
         if (recording) {
             // 录音时药丸是白的，里面三根声波用键底色挖出来
-            val barW = pillW * 0.15f
-            val gap = pillW * 0.10f
+            val barW = pillW * 0.10f
+            val gap = pillW * 0.12f
             repeat(3) { i ->
                 val phase = (wave + i * 0.22f) % 1f
                 val level = 0.5f + 0.5f * sin(phase * 2f * PI.toFloat())
-                val h = pillH * (0.24f + 0.24f * level)
+                val h = pillH * (0.38f + 0.30f * level)
                 val x = pillW / 2f + (i - 1) * (barW + gap) - barW / 2f
                 drawRoundRect(
                     color = cutout,

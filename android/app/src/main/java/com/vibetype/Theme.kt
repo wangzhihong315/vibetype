@@ -31,6 +31,7 @@ data class VibePalette(
     val capsulePressed: Color,
     val capsuleIdleTop: Color,
     val capsuleIdleBottom: Color,
+    val capsuleBorder: Color,
     val greenText: Color,
     val greenTint: Color,
     val padTop: Color,
@@ -50,11 +51,12 @@ private val Light = VibePalette(
     selected = Color(0xFFFFFFFF),
     field = Color(0xFFF5F5F7),
     line = Color(0x11000000),
-    capsuleTintTop = Color(0xFFFFF4F0),
-    capsuleTintBottom = Color(0xFFFFE8E0),
-    capsulePressed = Color(0xFFFFE1D7),
+    capsuleTintTop = Color(0xFFFCF8F2),
+    capsuleTintBottom = Color(0xFFF3EBE1),
+    capsulePressed = Color(0xFFF7EFE4),
     capsuleIdleTop = Color(0xFFF5F5F7),
     capsuleIdleBottom = Color(0xFFEFEFF1),
+    capsuleBorder = Color(0x1A3C2D1E),
     greenText = Color(0xFF1F9D43),
     greenTint = Color(0x1F30D158),
     padTop = Color(0xFF1D1E24),
@@ -74,11 +76,12 @@ private val Dark = VibePalette(
     selected = Color(0xFF3A3B42),
     field = Color(0xFF232429),
     line = Color(0x1FFFFFFF),
-    capsuleTintTop = Color(0xFF2A1A16),
-    capsuleTintBottom = Color(0xFF35211B),
-    capsulePressed = Color(0xFF3A211B),
+    capsuleTintTop = Color(0xFF211D19),
+    capsuleTintBottom = Color(0xFF171512),
+    capsulePressed = Color(0xFF2A251F),
     capsuleIdleTop = Color(0xFF232429),
     capsuleIdleBottom = Color(0xFF1C1D22),
+    capsuleBorder = Color(0x14FFFFFF),
     greenText = Color(0xFF4ADE80),
     greenTint = Color(0x262FD158),
     padTop = Color(0xFF1D1E24),
@@ -112,6 +115,7 @@ val VibeCapsuleTintBottom get() = Vibe.p.capsuleTintBottom
 val VibeCapsulePressed get() = Vibe.p.capsulePressed
 val VibeCapsuleIdleTop get() = Vibe.p.capsuleIdleTop
 val VibeCapsuleIdleBottom get() = Vibe.p.capsuleIdleBottom
+val VibeCapsuleBorder get() = Vibe.p.capsuleBorder
 val VibeGreenText get() = Vibe.p.greenText
 val VibeGreenTint get() = Vibe.p.greenTint
 val VibePadTop get() = Vibe.p.padTop
