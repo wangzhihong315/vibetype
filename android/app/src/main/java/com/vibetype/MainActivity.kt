@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vibetype.net.PairLinks
 import com.vibetype.ui.App
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -67,13 +68,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handlePairLink(intent: Intent?) {
-        val data = intent?.data ?: return
-        if (data.scheme != "vibetype" || data.host != "pair") return
-        val host = data.getQueryParameter("h")?.trim().orEmpty()
-        val code = data.getQueryParameter("c")?.trim().orEmpty()
-        if (host.isEmpty() || code.isEmpty()) return
-        val port = data.getQueryParameter("p")?.toIntOrNull() ?: 47823
-        pairRequest.value = PairRequest(host, port, code)
+        val raw = intent?.data?.toString() ?: return
+        val link = PairLinks.parse(raw) ?: return
+        pairRequest.value = PairRequest(link.host, link.port, link.code)
     }
 
     private fun hasMicrophone(context: Context): Boolean {

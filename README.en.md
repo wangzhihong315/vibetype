@@ -67,6 +67,7 @@ v0.1 in development: hold to talk → local transcription → type on the deskto
 - [x] First-run onboarding, gesture playground, trackpad speed and edge-scroll settings
 - [x] Chinese/English UI on both phone and desktop, plus dark mode (follow system or manual)
 - [x] Automatic desktop discovery after an office/Wi-Fi change (UDP broadcast); manual address entry without re-pairing
+- [x] In-app QR pairing: the rear camera reads the desktop QR and fills in the address and code
 
 ## Using it with an agent
 

@@ -1,7 +1,13 @@
 package com.vibetype.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.vibetype.VibeBlue
 import com.vibetype.VibeCard
 import com.vibetype.VibeCoral
@@ -43,6 +50,7 @@ import com.vibetype.VibeFaint
 import com.vibetype.VibeInk
 import com.vibetype.VibeMuted
 import com.vibetype.net.ConnState
+import com.vibetype.net.PairLinks
 
 @Composable
 fun PairingScreen(
@@ -57,6 +65,23 @@ fun PairingScreen(
     var port by rememberSaveable { mutableStateOf(initialPort) }
     var code by rememberSaveable { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
+    var showScanner by remember { mutableStateOf(false) }
+    var cameraDenied by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val cameraPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        cameraDenied = !granted
+        if (granted) showScanner = true
+    }
+    fun openScanner() {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) showScanner = true else cameraPermission.launch(Manifest.permission.CAMERA)
+    }
 
     val copy = pairingCopy(english)
 
@@ -89,7 +114,31 @@ fun PairingScreen(
             color = VibeMuted,
         )
 
-        Spacer(Modifier.height(34.dp))
+        Spacer(Modifier.height(24.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(VibeBlue.copy(alpha = 0.10f))
+                .clickable { openScanner() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                copy.scan,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = VibeBlue,
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(copy.scanHint, fontSize = 11.sp, color = VibeFaint)
+        if (cameraDenied) {
+            Spacer(Modifier.height(4.dp))
+            Text(copy.cameraDenied, fontSize = 11.sp, color = VibeCoral)
+        }
+
+        Spacer(Modifier.height(24.dp))
 
         Column(
             Modifier
@@ -184,6 +233,28 @@ fun PairingScreen(
             color = VibeFaint,
         )
         Spacer(Modifier.height(24.dp))
+
+        if (showScanner) {
+            QrScannerDialog(
+                title = copy.scanTitle,
+                lead = copy.scanLead,
+                closeLabel = copy.close,
+                cameraError = copy.cameraError,
+                fallbackHint = copy.scanFallback,
+                onDismiss = { showScanner = false },
+                onScanned = { raw ->
+                    val link = PairLinks.parse(raw)
+                    if (link != null) {
+                        showScanner = false
+                        host = link.host
+                        port = link.port.toString()
+                        code = link.code
+                        localError = null
+                        onPair(link.host, link.port, link.code)
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -234,6 +305,14 @@ private data class PairingCopy(
     val step2: String,
     val step3: String,
     val footer: String,
+    val scan: String,
+    val scanHint: String,
+    val cameraDenied: String,
+    val scanTitle: String,
+    val scanLead: String,
+    val close: String,
+    val cameraError: String,
+    val scanFallback: String,
 )
 
 private fun pairingCopy(english: Boolean): PairingCopy = if (english) {
@@ -249,6 +328,14 @@ private fun pairingCopy(english: Boolean): PairingCopy = if (english) {
         step2 = "Copy the address and code from the computer window",
         step3 = "Connect here once — it reconnects automatically after that",
         footer = "Audio never leaves the phone. Only text goes over the network.",
+        scan = "Scan the QR code on your computer",
+        scanHint = "Scanning fills in the address and pairing code for you",
+        cameraDenied = "No camera permission. You can still enter the address below.",
+        scanTitle = "Point at the QR code",
+        scanLead = "Open the QR code on the desktop Connect page",
+        close = "Close",
+        cameraError = "Camera unavailable. Enter the address below instead.",
+        scanFallback = "Black screen? Close and enter the address below.",
     )
 } else {
     PairingCopy(
@@ -263,5 +350,13 @@ private fun pairingCopy(english: Boolean): PairingCopy = if (english) {
         step2 = "电脑端窗口里抄下地址和配对码",
         step3 = "回到这里连接，之后会自动重连",
         footer = "录音只在手机本地转写，过网的只有文字。",
+        scan = "扫电脑上的二维码",
+        scanHint = "扫一下会自动填好地址和配对码",
+        cameraDenied = "没有相机权限，可以继续在下面手动输入。",
+        scanTitle = "对准电脑上的二维码",
+        scanLead = "在电脑端「连接」页打开二维码",
+        close = "关闭",
+        cameraError = "相机不可用，请在下面手动输入地址。",
+        scanFallback = "一直黑屏？关闭后在下面手动输入地址。",
     )
 }
