@@ -376,7 +376,7 @@ impl AppState {
             }
             inner.capsules.retain(|c| c.id != incoming.id);
             inner.capsules.insert(0, incoming);
-            inner.capsules.truncate(200);
+            // 完整留档，不截断；手机才是源头。给模型的条数限制放在 capsules_list 的 limit 上。
             save_json(&self.app, "capsules.json", &inner.capsules);
         }
         self.emit_state();
