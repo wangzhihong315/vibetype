@@ -49,3 +49,96 @@ Android
 Codex
 Claude
 DeepSeek
+GPT
+ChatGPT
+OpenAI
+Anthropic
+Gemini
+Qwen
+Kimi
+GLM
+Llama
+Mistral
+Hugging Face
+Transformer
+embedding
+fine-tuning
+inference
+RAG
+agent
+multimodal
+diffusion
+Stable Diffusion
+Midjourney
+TTS
+ASR
+OCR
+vLLM
+Ollama
+LoRA
+RLHF
+DPO
+SFT
+MoE
+KV cache
+vector database
+function calling
+tool calling
+hallucination
+benchmark
+context window
+system prompt
+tokenizer
+Copilot
+Cursor
+Claude Code
+ZCode
+OpenCode
+WorkBuddy
+Qwen Code
+Next.js
+Nuxt
+Svelte
+Vite
+Webpack
+Tailwind CSS
+Jetpack Compose
+SwiftUI
+Cargo
+Spring Boot
+PHP
+Laravel
+Ruby
+Rails
+PostgreSQL
+MySQL
+SQLite
+MongoDB
+Kafka
+RabbitMQ
+Elasticsearch
+Nginx
+Kubernetes
+Helm
+Terraform
+Jenkins
+GitHub Actions
+GitLab
+AWS
+GCP
+Azure
+Vercel
+Netlify
+Supabase
+Firebase
+GraphQL
+gRPC
+WebSocket
+JWT
+OAuth
+CORS
+REST API
+HTML
+CSS
+useEffect
+useState
