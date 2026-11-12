@@ -119,7 +119,8 @@ class DesktopClient(private val settings: PairingStore) {
         if (_state.value is ConnState.Connected) return
         scope.launch {
             discoverNow()
-            restart()
+            // 广播这一秒里可能已经自己连上了，别再打断一次。
+            if (_state.value !is ConnState.Connected) restart()
         }
     }
 
