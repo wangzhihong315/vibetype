@@ -131,6 +131,558 @@
     [
       "克劳德",
       "Claude"
+    ],
+    [
+      "杰森数据",
+      "JSON数据"
+    ],
+    [
+      "杰森字符串",
+      "JSON字符串"
+    ],
+    [
+      "杰森解析",
+      "JSON解析"
+    ],
+    [
+      "解析杰森",
+      "解析JSON"
+    ],
+    [
+      "杰森 文件",
+      "JSON 文件"
+    ],
+    [
+      "杰森 格式",
+      "JSON 格式"
+    ],
+    [
+      "杰森 数据",
+      "JSON 数据"
+    ],
+    [
+      "杰森 字符串",
+      "JSON 字符串"
+    ],
+    [
+      "杰森 解析",
+      "JSON 解析"
+    ],
+    [
+      "解析 杰森",
+      "解析 JSON"
+    ],
+    [
+      "jason文件",
+      "JSON文件"
+    ],
+    [
+      "jason格式",
+      "JSON格式"
+    ],
+    [
+      "jason数据",
+      "JSON数据"
+    ],
+    [
+      "jason字符串",
+      "JSON字符串"
+    ],
+    [
+      "jason解析",
+      "JSON解析"
+    ],
+    [
+      "解析jason",
+      "解析JSON"
+    ],
+    [
+      "jason 文件",
+      "JSON 文件"
+    ],
+    [
+      "jason 格式",
+      "JSON 格式"
+    ],
+    [
+      "jason 数据",
+      "JSON 数据"
+    ],
+    [
+      "jason 字符串",
+      "JSON 字符串"
+    ],
+    [
+      "jason 解析",
+      "JSON 解析"
+    ],
+    [
+      "解析 jason",
+      "解析 JSON"
+    ],
+    [
+      "j son",
+      "JSON"
+    ],
+    [
+      "j-son",
+      "JSON"
+    ],
+    [
+      "a p i",
+      "API"
+    ],
+    [
+      "a-p-i",
+      "API"
+    ],
+    [
+      "s d k",
+      "SDK"
+    ],
+    [
+      "c l i",
+      "CLI"
+    ],
+    [
+      "m c p",
+      "MCP"
+    ],
+    [
+      "l l m",
+      "LLM"
+    ],
+    [
+      "g p t",
+      "GPT"
+    ],
+    [
+      "西艾尔艾",
+      "CLI"
+    ],
+    [
+      "艾尔艾尔艾姆",
+      "LLM"
+    ],
+    [
+      "吉皮提",
+      "GPT"
+    ],
+    [
+      "恰特 gpt",
+      "ChatGPT"
+    ],
+    [
+      "chat gpt",
+      "ChatGPT"
+    ],
+    [
+      "chat-gpt",
+      "ChatGPT"
+    ],
+    [
+      "克劳德 代码",
+      "Claude Code"
+    ],
+    [
+      "克劳德 code",
+      "Claude Code"
+    ],
+    [
+      "cloud code",
+      "Claude Code"
+    ],
+    [
+      "claude code",
+      "Claude Code"
+    ],
+    [
+      "claude-code",
+      "Claude Code"
+    ],
+    [
+      "deep seek",
+      "DeepSeek"
+    ],
+    [
+      "deep-seek",
+      "DeepSeek"
+    ],
+    [
+      "深度求索",
+      "DeepSeek"
+    ],
+    [
+      "杰米尼",
+      "Gemini"
+    ],
+    [
+      "通义千问",
+      "Qwen"
+    ],
+    [
+      "千问",
+      "Qwen"
+    ],
+    [
+      "拉玛",
+      "Llama"
+    ],
+    [
+      "米斯特拉尔",
+      "Mistral"
+    ],
+    [
+      "抱抱脸",
+      "Hugging Face"
+    ],
+    [
+      "哈金 face",
+      "Hugging Face"
+    ],
+    [
+      "hugging face",
+      "Hugging Face"
+    ],
+    [
+      "稳定扩散",
+      "Stable Diffusion"
+    ],
+    [
+      "stable diffusion",
+      "Stable Diffusion"
+    ],
+    [
+      "中途之旅",
+      "Midjourney"
+    ],
+    [
+      "mid journey",
+      "Midjourney"
+    ],
+    [
+      "dall e",
+      "DALL·E"
+    ],
+    [
+      "v l l m",
+      "vLLM"
+    ],
+    [
+      "奥拉玛",
+      "Ollama"
+    ],
+    [
+      "r l h f",
+      "RLHF"
+    ],
+    [
+      "k v cache",
+      "KV cache"
+    ],
+    [
+      "kv cache",
+      "KV cache"
+    ],
+    [
+      "模型上下文协议",
+      "MCP"
+    ],
+    [
+      "检索增强生成",
+      "RAG"
+    ],
+    [
+      "混合专家",
+      "MoE"
+    ],
+    [
+      "大语言模型",
+      "LLM"
+    ],
+    [
+      "large language model",
+      "LLM"
+    ],
+    [
+      "mixture of experts",
+      "MoE"
+    ],
+    [
+      "retrieval augmented generation",
+      "RAG"
+    ],
+    [
+      "model context protocol",
+      "MCP"
+    ],
+    [
+      "z code",
+      "ZCode"
+    ],
+    [
+      "open code",
+      "OpenCode"
+    ],
+    [
+      "work buddy",
+      "WorkBuddy"
+    ],
+    [
+      "qwen code",
+      "Qwen Code"
+    ],
+    [
+      "deepseek harness",
+      "DeepSeek Harness"
+    ],
+    [
+      "github copilot",
+      "GitHub Copilot"
+    ],
+    [
+      "next js",
+      "Next.js"
+    ],
+    [
+      "next.js",
+      "Next.js"
+    ],
+    [
+      "node js",
+      "Node.js"
+    ],
+    [
+      "node.js",
+      "Node.js"
+    ],
+    [
+      "nuxt js",
+      "Nuxt"
+    ],
+    [
+      "vue js",
+      "Vue"
+    ],
+    [
+      "react js",
+      "React"
+    ],
+    [
+      "tailwind css",
+      "Tailwind CSS"
+    ],
+    [
+      "jetpack compose",
+      "Jetpack Compose"
+    ],
+    [
+      "swift ui",
+      "SwiftUI"
+    ],
+    [
+      "x code",
+      "Xcode"
+    ],
+    [
+      "spring boot",
+      "Spring Boot"
+    ],
+    [
+      "c plus plus",
+      "C++"
+    ],
+    [
+      "c sharp",
+      "C#"
+    ],
+    [
+      "asp dot net",
+      "ASP.NET"
+    ],
+    [
+      "dot net",
+      ".NET"
+    ],
+    [
+      "my sequel",
+      "MySQL"
+    ],
+    [
+      "my sql",
+      "MySQL"
+    ],
+    [
+      "postgres sql",
+      "PostgreSQL"
+    ],
+    [
+      "mongo db",
+      "MongoDB"
+    ],
+    [
+      "rabbit mq",
+      "RabbitMQ"
+    ],
+    [
+      "elastic search",
+      "Elasticsearch"
+    ],
+    [
+      "engine x",
+      "Nginx"
+    ],
+    [
+      "k 8 s",
+      "Kubernetes"
+    ],
+    [
+      "docker compose",
+      "Docker Compose"
+    ],
+    [
+      "git hub",
+      "GitHub"
+    ],
+    [
+      "github actions",
+      "GitHub Actions"
+    ],
+    [
+      "github action",
+      "GitHub Actions"
+    ],
+    [
+      "gitlab ci",
+      "GitLab CI"
+    ],
+    [
+      "ci cd",
+      "CI/CD"
+    ],
+    [
+      "ci/cd",
+      "CI/CD"
+    ],
+    [
+      "vs code",
+      "VS Code"
+    ],
+    [
+      "visual studio code",
+      "Visual Studio Code"
+    ],
+    [
+      "a w s",
+      "AWS"
+    ],
+    [
+      "g c p",
+      "GCP"
+    ],
+    [
+      "graph ql",
+      "GraphQL"
+    ],
+    [
+      "g rpc",
+      "gRPC"
+    ],
+    [
+      "web socket",
+      "WebSocket"
+    ],
+    [
+      "j w t",
+      "JWT"
+    ],
+    [
+      "o auth",
+      "OAuth"
+    ],
+    [
+      "rest api",
+      "REST API"
+    ],
+    [
+      "restful api",
+      "REST API"
+    ],
+    [
+      "use effect",
+      "useEffect"
+    ],
+    [
+      "use state",
+      "useState"
+    ],
+    [
+      "use memo",
+      "useMemo"
+    ],
+    [
+      "use ref",
+      "useRef"
+    ],
+    [
+      "type script",
+      "TypeScript"
+    ],
+    [
+      "java script",
+      "JavaScript"
+    ],
+    [
+      "visual studio",
+      "Visual Studio"
+    ],
+    [
+      "react native",
+      "React Native"
+    ],
+    [
+      "android studio",
+      "Android Studio"
+    ],
+    [
+      "intellij idea",
+      "IntelliJ IDEA"
+    ],
+    [
+      "web storm",
+      "WebStorm"
+    ],
+    [
+      "vue.js",
+      "Vue"
+    ],
+    [
+      "react.js",
+      "React"
+    ],
+    [
+      "nuxt.js",
+      "Nuxt"
+    ],
+    [
+      "angular.js",
+      "Angular"
+    ],
+    [
+      "nest.js",
+      "NestJS"
+    ],
+    [
+      "three.js",
+      "Three.js"
+    ],
+    [
+      "express.js",
+      "Express"
+    ],
+    [
+      "github desktop",
+      "GitHub Desktop"
     ]
   ],
   "context": [
@@ -144,6 +696,14 @@
     ],
     [
       "跑一遍一百零一",
+      "跑一遍 CI"
+    ],
+    [
+      "跑一遍 词",
+      "跑一遍 CI"
+    ],
+    [
+      "跑一遍ci",
       "跑一遍 CI"
     ]
   ],
@@ -212,6 +772,123 @@
     "merge": "merge",
     "config": "config",
     "token": "token",
-    "debug": "debug"
+    "debug": "debug",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "qwen": "Qwen",
+    "kimi": "Kimi",
+    "glm": "GLM",
+    "llama": "Llama",
+    "mistral": "Mistral",
+    "huggingface": "Hugging Face",
+    "transformer": "Transformer",
+    "finetuning": "fine-tuning",
+    "rag": "RAG",
+    "tts": "TTS",
+    "asr": "ASR",
+    "ocr": "OCR",
+    "vllm": "vLLM",
+    "ollama": "Ollama",
+    "lora": "LoRA",
+    "rlhf": "RLHF",
+    "dpo": "DPO",
+    "sft": "SFT",
+    "moe": "MoE",
+    "dalle": "DALL·E",
+    "stablediffusion": "Stable Diffusion",
+    "midjourney": "Midjourney",
+    "copilot": "Copilot",
+    "zcode": "ZCode",
+    "opencode": "OpenCode",
+    "workbuddy": "WorkBuddy",
+    "claudecode": "Claude Code",
+    "nextjs": "Next.js",
+    "nodejs": "Node.js",
+    "nuxtjs": "Nuxt",
+    "vuejs": "Vue",
+    "reactjs": "React",
+    "sveltekit": "SvelteKit",
+    "svelte": "Svelte",
+    "vite": "Vite",
+    "webpack": "Webpack",
+    "tailwindcss": "Tailwind CSS",
+    "swiftui": "SwiftUI",
+    "cargo": "Cargo",
+    "springboot": "Spring Boot",
+    "cpp": "C++",
+    "csharp": "C#",
+    "dotnet": ".NET",
+    "aspnet": "ASP.NET",
+    "php": "PHP",
+    "laravel": "Laravel",
+    "ruby": "Ruby",
+    "rails": "Rails",
+    "postgres": "PostgreSQL",
+    "sqlite": "SQLite",
+    "mongodb": "MongoDB",
+    "kafka": "Kafka",
+    "rabbitmq": "RabbitMQ",
+    "elasticsearch": "Elasticsearch",
+    "nginx": "Nginx",
+    "kubernetes": "Kubernetes",
+    "k8s": "Kubernetes",
+    "helm": "Helm",
+    "terraform": "Terraform",
+    "ansible": "Ansible",
+    "jenkins": "Jenkins",
+    "aws": "AWS",
+    "gcp": "GCP",
+    "azure": "Azure",
+    "vercel": "Vercel",
+    "netlify": "Netlify",
+    "cloudflare": "Cloudflare",
+    "supabase": "Supabase",
+    "firebase": "Firebase",
+    "graphql": "GraphQL",
+    "grpc": "gRPC",
+    "websocket": "WebSocket",
+    "sse": "SSE",
+    "jwt": "JWT",
+    "oauth": "OAuth",
+    "cors": "CORS",
+    "html": "HTML",
+    "css": "CSS",
+    "scss": "SCSS",
+    "xml": "XML",
+    "markdown": "Markdown",
+    "e2e": "E2E",
+    "tdd": "TDD",
+    "bdd": "BDD",
+    "pr": "PR",
+    "ide": "IDE",
+    "cpu": "CPU",
+    "gpu": "GPU",
+    "dns": "DNS",
+    "cdn": "CDN",
+    "tcp": "TCP",
+    "udp": "UDP",
+    "tls": "TLS",
+    "ssh": "SSH",
+    "vscode": "VS Code",
+    "jetbrains": "JetBrains",
+    "webstorm": "WebStorm",
+    "pycharm": "PyCharm",
+    "intellij": "IntelliJ",
+    "ipados": "iPadOS",
+    "npx": "npx",
+    "pnpm": "pnpm",
+    "ci": "CI",
+    "ai": "AI",
+    "nestjs": "NestJS",
+    "threejs": "Three.js",
+    "expressjs": "Express",
+    "reactnative": "React Native",
+    "androidstudio": "Android Studio",
+    "intellijidea": "IntelliJ IDEA",
+    "visualstudiocode": "Visual Studio Code",
+    "visualstudio": "Visual Studio",
+    "githubdesktop": "GitHub Desktop",
+    "tailwind": "Tailwind",
+    "d3js": "D3.js"
   }
 }
