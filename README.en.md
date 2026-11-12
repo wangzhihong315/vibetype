@@ -66,6 +66,7 @@ v0.1 in development: hold to talk → local transcription → type on the deskto
 - [ ] English term recognition (JSON heard as “J song”)
 - [x] First-run onboarding, gesture playground, trackpad speed and edge-scroll settings
 - [x] Chinese/English UI on both phone and desktop, plus dark mode (follow system or manual)
+- [x] Automatic desktop discovery after an office/Wi-Fi change (UDP broadcast); manual address entry without re-pairing
 
 ## Using it with an agent
 

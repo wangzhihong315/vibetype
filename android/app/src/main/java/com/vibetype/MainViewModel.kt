@@ -118,6 +118,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         Copy.apply(_language.value, systemChinese = Locale.getDefault().language.startsWith("zh"))
         client.start()
+        // 换 Wi-Fi / 换办公室后立刻重新发现电脑，不用等指数退避。
+        runCatching {
+            val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+                as android.net.ConnectivityManager
+            cm.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    client.retryNow()
+                }
+            })
+        }
         loadModel()
         viewModelScope.launch { capsuleStore.load() }
         viewModelScope.launch {
@@ -530,7 +540,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         settings.seenGestures = true
     }
 
-    fun pair(host: String, port: Int, code: String) {        settings.save(host.trim(), port, code.trim())
+    /** 找不到电脑时点一下：重新广播发现 + 立刻重连。 */
+    fun retryNow() {
+        client.retryNow()
+    }
+
+    /** 手动改地址：保留已经配对过的 deviceToken，只换 host/port。 */
+    fun saveAddress(host: String, port: Int) {
+        val trimmed = host.trim()
+        if (trimmed.isEmpty() || port !in 1..65535) return
+        settings.host = trimmed
+        settings.port = port
+        settings.deviceToken?.takeIf { it.isNotBlank() }?.let { settings.token = it }
+        _notice.value = null
+        client.restart()
+    }
+
+    val savedHost: String get() = settings.host.orEmpty()
+    val savedPort: Int get() = settings.port
+
+    fun pair(host: String, port: Int, code: String) {
+        settings.save(host.trim(), port, code.trim())
         settings.deviceToken = null
         _paired.value = true
         client.restart()

@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,6 +89,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -152,6 +154,7 @@ fun RemoteScreen(
     var showCapsules by remember { mutableStateOf(false) }
     var showGestures by remember { mutableStateOf(false) }
     var showTranscript by remember { mutableStateOf(false) }
+    var showConnect by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
 
     val capsules by vm.capsules.collectAsState()
@@ -242,6 +245,8 @@ fun RemoteScreen(
             onRetry = vm::resendLast,
             onOpenTranscript = { showTranscript = true },
             onZoom = vm::sendZoom,
+            onReconnect = vm::retryNow,
+            onManualConnect = { showConnect = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -297,6 +302,16 @@ fun RemoteScreen(
                 showSettings = false
                 vm.unpair()
             },
+        )
+    }
+    if (showConnect) {
+        ConnectSheet(
+            initialHost = vm.savedHost,
+            initialPort = vm.savedPort.toString(),
+            connected = connected,
+            onDismiss = { showConnect = false },
+            onAutoFind = vm::retryNow,
+            onSave = vm::saveAddress,
         )
     }
     if (showGestures) {
@@ -376,6 +391,8 @@ private fun Trackpad(
     onRetry: () -> Unit,
     onOpenTranscript: () -> Unit,
     onZoom: (Float) -> Unit,
+    onReconnect: () -> Unit,
+    onManualConnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current.density
@@ -412,7 +429,10 @@ private fun Trackpad(
         )
 
         when {
-            !connected && !capsuleRecording -> DisconnectedOverlay()
+            !connected && !capsuleRecording -> DisconnectedOverlay(
+                onReconnect = onReconnect,
+                onManualConnect = onManualConnect,
+            )
             capsuleRecording -> RecordingOverlay(
                 level = level,
                 seconds = seconds,
@@ -645,7 +665,10 @@ private suspend fun PointerInputScope.trackpadGestures(
 private fun BoxScopeDisconnected() = Unit
 
 @Composable
-private fun DisconnectedOverlay() {
+private fun DisconnectedOverlay(
+    onReconnect: () -> Unit,
+    onManualConnect: () -> Unit,
+) {
     Box(
         Modifier
             .fillMaxSize()
@@ -653,13 +676,51 @@ private fun DisconnectedOverlay() {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(Copy.t("先连上电脑", "Connect to your computer first"), fontSize = 15.sp, color = Color.White.copy(alpha = 0.8f))
-            Spacer(Modifier.height(5.dp))
             Text(
-                Copy.t("配对之后，触控板和按键才有用", "The trackpad and keys work after pairing"),
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.42f),
+                Copy.t("连不上电脑", "Can't reach the computer"),
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.9f),
             )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                Copy.t(
+                    "换了网络地址会变，先自动找一下。",
+                    "The address changes with the network. Try auto-find first.",
+                ),
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = Color.White.copy(alpha = 0.45f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 40.dp),
+            )
+            Spacer(Modifier.height(20.dp))
+            Box(
+                Modifier
+                    .width(190.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .clickable(onClick = onReconnect),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(Copy.t("自动查找电脑", "Find my computer"), fontSize = 13.sp, color = VibeInk)
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .width(190.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+                    .clickable(onClick = onManualConnect),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    Copy.t("手动输入地址", "Enter address"),
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+            }
         }
     }
 }
@@ -1327,6 +1388,129 @@ private fun KeyButton(
             },
             color = if (enabled) VibeInk else VibeFaint,
         )
+    }
+}
+
+
+/**
+ * 换办公室/换 Wi-Fi 后电脑 IP 会变。这个面板给两条路：
+ * 自动在同一网段广播找，或者手动填新地址（token 不变，不用重新配对）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConnectSheet(
+    initialHost: String,
+    initialPort: String,
+    connected: Boolean,
+    onDismiss: () -> Unit,
+    onAutoFind: () -> Unit,
+    onSave: (String, Int) -> Unit,
+) {
+    var host by remember { mutableStateOf(initialHost) }
+    var port by remember { mutableStateOf(initialPort) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(connected) {
+        if (connected) onDismiss()
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = VibeCard,
+        contentColor = VibeInk,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 18.dp),
+        ) {
+            Text(
+                Copy.t("连接电脑", "Connect to computer"),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VibeInk,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                Copy.t(
+                    "换了网络，电脑地址会变。自动查找会在同一 Wi-Fi 下广播寻找 VibeType；也可以手动填电脑上显示的地址。",
+                    "The computer's address changes with the network. Auto-find broadcasts on the same Wi-Fi for VibeType, or enter the address shown on the computer.",
+                ),
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = VibeMuted,
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = host,
+                onValueChange = { host = it },
+                label = { Text(Copy.t("电脑地址", "Computer address")) },
+                placeholder = { Text("192.168.1.23") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = port,
+                onValueChange = { input -> port = input.filter { it.isDigit() }.take(5) },
+                label = { Text(Copy.t("端口", "Port")) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.width(150.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(VibeBlue)
+                    .clickable(onClick = onAutoFind),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    Copy.t("自动查找并连接", "Find and connect"),
+                    fontSize = 14.sp,
+                    color = Color.White,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(VibeField)
+                    .clickable {
+                        val value = port.toIntOrNull() ?: 47823
+                        onSave(host, value)
+                        onDismiss()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    Copy.t("保存地址并重连", "Save address and reconnect"),
+                    fontSize = 14.sp,
+                    color = VibeInk,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                Copy.t(
+                    "电脑端「连接」页能看到当前地址和配对码；地址不变就不用重新扫码。",
+                    "The desktop Connect page shows the current address and pairing code. If the address stays the same, there is no need to pair again.",
+                ),
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                color = VibeFaint,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

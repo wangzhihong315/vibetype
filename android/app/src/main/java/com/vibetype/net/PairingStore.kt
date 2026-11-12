@@ -27,6 +27,11 @@ class PairingStore(context: Context) {
         get() = prefs.getString("deviceToken", null)
         set(value) = prefs.edit().putString("deviceToken", value).apply()
 
+    /** 桌面的稳定标识：局域网自动发现时用来认出“这是我配对过的那台”。 */
+    var desktopId: String?
+        get() = prefs.getString("desktopId", null)
+        set(value) = prefs.edit().putString("desktopId", value).apply()
+
     var desktopName: String?
         get() = prefs.getString("desktopName", null)
         set(value) = prefs.edit().putString("desktopName", value).apply()

@@ -1,3 +1,4 @@
+mod discovery;
 mod inject;
 pub mod mcp;
 mod server;
@@ -247,6 +248,7 @@ pub fn run() {
             #[cfg(debug_assertions)]
             println!("VibeType accessibility trusted: {trusted}");
 
+            discovery::spawn(state::PORT, state.desktop_id());
             tauri::async_runtime::spawn(server::run(state));
 
             let show = MenuItem::with_id(app, "show", "打开 VibeType", true, None::<&str>)?;

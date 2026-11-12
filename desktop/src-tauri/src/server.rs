@@ -148,6 +148,7 @@ async fn handle(stream: TcpStream, state: AppState) -> anyhow::Result<()> {
         "platform": std::env::consts::OS,
         "inject": state.injection(),
         "deviceToken": issued.unwrap_or_default(),
+        "desktopId": state.desktop_id(),
         "keys": state.keymap(),
     });
     send_line(&mut writer, welcome).await?;

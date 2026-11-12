@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,7 +51,7 @@ data class KeySlot(val id: String, val label: String)
 private val defaultKeymap = listOf(
     KeySlot("k1", "回车"),
     KeySlot("k2", "删除"),
-    KeySlot("k3", "esc"),
+    KeySlot("k3", "Esc"),
     KeySlot("k4", "切换"),
     KeySlot("k5", "自定义"),
 )
@@ -63,6 +64,10 @@ class DesktopClient(private val settings: PairingStore) {
     private var socket: Socket? = null
     private var writer: BufferedWriter? = null
     private val writeLock = Any()
+
+    /** 用户点「重新连接」时立刻打断退避等待。 */
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+    private var lastDiscoveryAt = 0L
 
     private val pending = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
@@ -109,7 +114,17 @@ class DesktopClient(private val settings: PairingStore) {
         loopJob = scope.launch { loop() }
     }
 
+    /** 先广播找一次，再立刻重连；换 Wi-Fi / 换办公室后不用用户改地址。 */
+    fun retryNow() {
+        if (_state.value is ConnState.Connected) return
+        scope.launch {
+            discoverNow()
+            restart()
+        }
+    }
+
     /** 重新配对后调用：断开旧连接，立刻用新的 host/token 重连。 */
+    @Synchronized
     fun restart() {
         loopJob?.cancel()
         closeSocket()
@@ -220,18 +235,44 @@ class DesktopClient(private val settings: PairingStore) {
                 _state.value = ConnState.Connecting
                 delay(300)
             } catch (e: Exception) {
+                // restart() 会取消旧 loop 并关掉旧 socket；旧 loop 的 readLine
+                // 会抛 SocketException，但这不代表新连接失败。
+                if (!coroutineContext.isActive) break
                 _state.value = ConnState.Failed(humanize(e))
-                delay(backoff)
+                // 地址可能随网络变了：先在同一网段广播找一次，找到就立刻重试。
+                if (maybeDiscover()) {
+                    backoff = 1_000L
+                    continue
+                }
+                withTimeoutOrNull(backoff) { wake.receive() }
                 backoff = (backoff * 2).coerceAtMost(15_000L)
             }
         }
     }
 
-    private fun serve(host: String, port: Int, token: String) {
+    private suspend fun discoverNow(): LanDiscovery.Peer? {
+        if (settings.deviceToken.isNullOrBlank()) return null
+        val expected = settings.desktopId?.takeIf { it.isNotBlank() }
+        val peer = LanDiscovery.find(expected).firstOrNull() ?: return null
+        settings.host = peer.host
+        settings.port = peer.port
+        lastDiscoveryAt = System.currentTimeMillis()
+        Log.i(TAG, "discovered ${peer.host}:${peer.port}")
+        return peer
+    }
+
+    private suspend fun maybeDiscover(): Boolean {
+        if (System.currentTimeMillis() - lastDiscoveryAt < 6_000) return false
+        return discoverNow() != null
+    }
+
+    private suspend fun serve(host: String, port: Int, token: String) {
         val s = Socket()
         var heartbeat: Job? = null
         try {
             s.connect(InetSocketAddress(host, port), 4_000)
+            // 重启时旧连接可能在这之后才连上；别把已经过期的连接写进共享状态。
+            coroutineContext.ensureActive()
             s.tcpNoDelay = true
             socket = s
 
@@ -272,7 +313,7 @@ class DesktopClient(private val settings: PairingStore) {
             }
         } finally {
             heartbeat?.cancel()
-            closeSocket()
+            closeSocket(s)
         }
     }
 
@@ -292,6 +333,8 @@ class DesktopClient(private val settings: PairingStore) {
                     settings.token = issued
                 }
                 if (platform.isNotBlank()) settings.desktopName = platform
+                val desktopId = json.optString("desktopId", "")
+                if (desktopId.isNotBlank()) settings.desktopId = desktopId
                 applyKeymap(json)
                 _state.value = ConnState.Connected(server, platform)
             }
@@ -329,13 +372,17 @@ class DesktopClient(private val settings: PairingStore) {
         }
     }
 
-    private fun closeSocket() {
-        writer = null
-        try {
-            socket?.close()
-        } catch (_: Exception) {
+    /** expected 不为空时，只关自己那条连接：避免旧协程把新连接一起关掉。 */
+    private fun closeSocket(expected: Socket? = null) {
+        synchronized(writeLock) {
+            if (expected != null && socket !== expected) return
+            writer = null
+            try {
+                socket?.close()
+            } catch (_: Exception) {
+            }
+            socket = null
         }
-        socket = null
         pending.values.forEach { it.complete(false) }
         pending.clear()
     }

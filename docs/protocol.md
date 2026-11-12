@@ -17,6 +17,24 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 
 配对成功后，桌面端下发长期 `deviceToken`（32 字节 hex），手机存本地；之后每次连接直接用它。
 
+## 局域网自动发现
+
+电脑换 IP（换办公室、换 Wi-Fi）后，手机不再需要重新输入地址。手机向 UDP `47824` 广播：
+
+```
+VIBETYPE_DISCOVER
+```
+
+桌面端从同一端口回：
+
+```json
+{"vibetype":1,"id":"d7906fbc66dba52b","port":47823,"platform":"macos"}
+```
+
+- `id` 是桌面端持久化的稳定标识；手机只接受与自己记住的 `desktopId` 相同的回包（尚未记住时接受第一个），避免连到同网段的另一台 VibeType。
+- 手机拿到回包来源 IP 后，用原来的 `deviceToken` 重新走 TCP 握手。广播里不含 token，身份校验仍在服务端。
+- 广播被 AP 隔离或跨网段挡住时，手机界面提供「手动输入地址」：只换 host/port，不用重新配对。
+
 ## 握手
 
 手机 → 桌面：
@@ -28,7 +46,7 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 桌面 → 手机（成功）：
 
 ```json
-{"t":"welcome","v":1,"server":"vibetype/0.1.0","platform":"macos","inject":"type","deviceToken":"<32 hex，仅首次配对时出现>"}
+{"t":"welcome","v":1,"server":"vibetype/0.1.0","platform":"macos","inject":"type","deviceToken":"<32 hex，仅首次配对时出现>","desktopId":"d7906fbc66dba52b"}
 ```
 
 桌面 → 手机（失败，随后断开）：

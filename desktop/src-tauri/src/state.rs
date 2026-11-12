@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::broadcast;
 
+pub const PORT: u16 = 47823;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
@@ -112,6 +114,8 @@ pub struct Device {
 }
 
 pub struct Inner {
+    /// 这台电脑的稳定标识，用于手机在局域网里认出它。
+    pub desktop_id: String,
     pub address: String,
     pub port: u16,
     pub code: String,
@@ -146,6 +150,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(app: AppHandle) -> Self {
         let code = new_code();
+        let desktop_id = load_desktop_id(&app);
         let devices = load_devices(&app);
         let capsules = load_json::<Vec<Capsule>>(&app, "capsules.json").unwrap_or_default();
         let keymap = load_json::<Vec<KeySlot>>(&app, "keymap.json")
@@ -166,8 +171,9 @@ impl AppState {
             _ => "type",
         };
         let inner = Inner {
+            desktop_id,
             address: "—".into(),
-            port: 47823,
+            port: PORT,
             qr_svg: String::new(),
             code,
             prev_code: String::new(),
@@ -185,6 +191,10 @@ impl AppState {
             inner: Arc::new(Mutex::new(inner)),
             keymap_tx,
         }
+    }
+
+    pub fn desktop_id(&self) -> String {
+        self.lock().desktop_id.clone()
     }
 
     pub fn subscribe_keymap(&self) -> broadcast::Receiver<Vec<KeySlot>> {
@@ -616,6 +626,26 @@ pub fn config_path(app: &AppHandle, name: &str) -> Option<std::path::PathBuf> {
 
 fn devices_path(app: &AppHandle) -> Option<std::path::PathBuf> {
     config_path(app, "devices.json")
+}
+
+fn load_desktop_id(app: &AppHandle) -> String {
+    let path = app.path().app_config_dir().ok().map(|dir| dir.join("desktop_id"));
+    if let Some(path) = &path {
+        if let Ok(text) = fs::read_to_string(path) {
+            let id = text.trim().to_string();
+            if id.len() >= 8 {
+                return id;
+            }
+        }
+    }
+    let id: String = format!("{:016x}", rand::thread_rng().gen::<u64>());
+    if let Some(path) = path {
+        if let Some(dir) = path.parent() {
+            let _ = fs::create_dir_all(dir);
+        }
+        let _ = fs::write(path, &id);
+    }
+    id
 }
 
 fn load_json<T: serde::de::DeserializeOwned>(app: &AppHandle, name: &str) -> Option<T> {

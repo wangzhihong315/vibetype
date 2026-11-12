@@ -17,6 +17,24 @@ vibetype://pair?h=192.168.1.23&p=47823&c=482913
 
 After pairing succeeds, the desktop issues a long-lived `deviceToken` (32-byte hex), which the phone stores locally; every later connection uses it directly.
 
+## LAN discovery
+
+When the computer changes IP (new office, new Wi-Fi), the phone no longer needs the new address typed in. The phone broadcasts over UDP `47824`:
+
+```
+VIBETYPE_DISCOVER
+```
+
+The desktop replies from the same port:
+
+```json
+{"vibetype":1,"id":"d7906fbc66dba52b","port":47823,"platform":"macos"}
+```
+
+- `id` is a stable, persisted desktop identifier. The phone only accepts replies whose id matches the `desktopId` it remembers (or the first reply if it has none yet), so it does not attach to another VibeType on the same subnet.
+- The phone uses the reply's source IP and re-runs the TCP handshake with the existing `deviceToken`. The broadcast carries no token; authentication stays on the server.
+- If broadcast is blocked by AP isolation or a subnet boundary, the phone offers "Enter address": change only host/port, no re-pairing.
+
 ## Handshake
 
 Phone → Desktop:
