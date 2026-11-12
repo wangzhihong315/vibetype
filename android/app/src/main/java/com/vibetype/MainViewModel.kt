@@ -110,6 +110,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     private var asr: XAsr? = null
+    private var connectivity: android.net.ConnectivityManager? = null
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
 
     /** debug 包才显示「自检」入口。 */
     val debuggable = (app.applicationInfo.flags and
@@ -122,11 +124,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         runCatching {
             val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
                 as android.net.ConnectivityManager
-            cm.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+            val callback = object : android.net.ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: android.net.Network) {
                     client.retryNow()
                 }
-            })
+            }
+            connectivity = cm
+            networkCallback = callback
+            cm.registerDefaultNetworkCallback(callback)
         }
         loadModel()
         viewModelScope.launch { capsuleStore.load() }
@@ -580,6 +585,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun copyLast(): String? = _last.value?.text
 
     override fun onCleared() {
+        runCatching {
+            networkCallback?.let { connectivity?.unregisterNetworkCallback(it) }
+        }
         client.stop()
         asr?.release()
         asr = null
